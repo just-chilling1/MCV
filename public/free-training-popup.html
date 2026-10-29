@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Free Training</title>
+<script>!function(i,n){i._plt=i._plt||(n&&n.timeOrigin?n.timeOrigin+n.now():Date.now())}(window,performance);</script>
+<link rel="preload" href="https://scripts.converteai.net/e9cd97bc-7bc8-4a23-bb2f-224a56a84d6b/players/6a723793e82132383c2edc33/v4/player.js" as="script">
+<link rel="preload" href="https://scripts.converteai.net/lib/js/smartplayer-wc/v4/smartplayer.js" as="script">
+<link rel="preload" href="https://cdn.converteai.net/e9cd97bc-7bc8-4a23-bb2f-224a56a84d6b/6a723759734ff4478beeff80/main.m3u8" as="fetch" crossorigin="anonymous">
+<link rel="dns-prefetch" href="https://cdn.converteai.net">
+<link rel="dns-prefetch" href="https://scripts.converteai.net">
+<link rel="dns-prefetch" href="https://images.converteai.net">
+<link rel="dns-prefetch" href="https://license.vturb.com">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: transparent;
+  }
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+  .popup {
+    position: relative;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    width: 100%;
+    max-width: 980px;
+    max-height: 92dvh;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 768px) {
+    .backdrop { padding: 24px; }
+    .popup {
+      grid-template-columns: 1.25fr 1fr;
+      align-items: stretch;
+      overflow: hidden;
+    }
+  }
+  .close-x {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    color: #9ca3af;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .close-x:hover { color: #374151; }
+  .video-col {
+    background: #000;
+    min-width: 0;
+  }
+  .video-host {
+    width: 100%;
+  }
+  @media (max-width: 767px) {
+    .video-host { aspect-ratio: 16 / 9; }
+  }
+  @media (min-width: 768px) {
+    .video-col {
+      height: 100%;
+      min-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .video-host {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .video-host vturb-smartplayer {
+      display: block !important;
+      margin: 0 auto !important;
+      padding-top: 0 !important;
+    }
+    .video-host .vturb-player-placeholder {
+      padding-top: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .video-host iframe,
+    .video-host video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+    }
+  }
+  .content-col {
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 14px;
+  }
+  @media (min-width: 640px) {
+    .content-col { padding: 32px 28px; gap: 16px; }
+  }
+  .badge {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+  }
+  h2 {
+    font-size: 18px;
+    line-height: 1.25;
+    color: #111827;
+    font-weight: 800;
+  }
+  @media (min-width: 640px) {
+    h2 { font-size: 22px; }
+  }
+  .sub {
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+  @media (min-width: 640px) {
+    .sub { font-size: 14px; }
+  }
+  .countdown-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+  .countdown-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #b91c1c;
+  }
+  .countdown {
+    font-variant-numeric: tabular-nums;
+    font-size: 40px;
+    font-weight: 800;
+    color: #111827;
+  }
+  @media (min-width: 640px) {
+    .countdown { font-size: 48px; }
+  }
+  .cta {
+    display: block;
+    width: 100%;
+    background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+    color: #111827;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 800;
+    padding: 16px 22px;
+    border-radius: 12px;
+    box-shadow: 0 10px 26px rgba(245, 158, 11, 0.45);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @media (min-width: 640px) {
+    .cta { font-size: 17px; }
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+  }
+  .warning { font-size: 12px; color: #9ca3af; }
+  body.closed .backdrop { display: none; }
+</style>
+</head>
+<body>
+  <div class="backdrop" id="backdrop">
+    <div class="popup" role="dialog" aria-modal="true" aria-label="Free training offer">
+      <button class="close-x" id="closeBtn" type="button" aria-label="Close">&#10005;</button>
+      <div class="video-col">
+        <div class="video-host" id="videoHost">
+          <vturb-smartplayer id="vid-6a723793e82132383c2edc33" style="display: block; width: 100%;">
+            <div class="vturb-player-placeholder" style="position: relative; width: 100%; z-index: 0; background-color: black;"></div>
+          </vturb-smartplayer>
+        </div>
+      </div>
+      <div class="content-col">
+        <span class="badge">Free Training</span>
+        <h2>Wake Up With An Extra $1,000&ndash;$5,000 In Your Bank Account Tomorrow</h2>
+        <p class="sub">Discover how to scale to $1,000&ndash;$5,000 every single day &mdash; without doing any extra work.</p>
+        <div class="countdown-wrap">
+          <span class="countdown-label">This offer expires in</span>
+          <span class="countdown" id="cd">10:00</span>
+        </div>
+        <a class="cta" href="https://the7figuresociety.com/earn-1k-2k-per-day" target="_blank" rel="noopener noreferrer">Watch The Free Training &gt;&gt;</a>
+        <span class="warning">Warning: This will be taken down soon</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var COUNTDOWN_SECONDS = 10 * 60;
+      var secondsLeft = COUNTDOWN_SECONDS;
+      var cd = document.getElementById("cd");
+      var closed = false;
+
+      function notifyParent() {
+        try {
+          window.parent.postMessage({ type: "free-training-popup-closed", source: "blackboxcash" }, "*");
+        } catch (e) {}
+      }
+
+      function closePopup() {
+        if (closed) return;
+        closed = true;
+        document.body.classList.add("closed");
+        notifyParent();
+      }
+
+      document.getElementById("closeBtn").addEventListener("click", closePopup);
+
+      var tick = setInterval(function () {
+        secondsLeft -= 1;
+        if (secondsLeft <= 0) {
+          clearInterval(tick);
+          cd.textContent = "0:00";
+          closePopup();
+          return;
+        }
+        var m = Math.floor(secondsLeft / 60);
+        var s = String(secondsLeft % 60).padStart(2, "0");
+        cd.textContent = m + ":" + s;
+      }, 1000);
+
+      function appendPlayerScript() {
+        var script = document.createElement("script");
+        script.src = "https://scripts.converteai.net/e9cd97bc-7bc8-4a23-bb2f-224a56a84d6b/players/6a723793e82132383c2edc33/v4/player.js";
+        script.async = true;
+        script.dataset.vturbPlayer = "vid-6a723793e82132383c2edc33";
+        document.head.appendChild(script);
+      }
+
+      function mountVturbPlayer() {
+        document
+          .querySelectorAll('script[data-vturb-player="vid-6a723793e82132383c2edc33"]')
+          .forEach(function (node) {
+            node.remove();
+          });
+        window.requestAnimationFrame(appendPlayerScript);
+      }
+
+      function fitVturbPlayer() {
+        if (window.innerWidth < 768) return;
+        var shell = document.querySelector(".video-col");
+        var host = document.getElementById("videoHost");
+        var player = host ? host.querySelector("vturb-smartplayer") : null;
+        if (!shell || !host || !player) return;
+        var shellHeight = shell.clientHeight;
+        var shellWidth = host.clientWidth;
+        if (shellHeight < 1 || shellWidth < 1) return;
+        var ratio = 16 / 9;
+        var width = shellWidth;
+        var height = width / ratio;
+        if (height > shellHeight) {
+          height = shellHeight;
+          width = height * ratio;
+        }
+        player.style.width = Math.floor(width) + "px";
+        player.style.height = Math.floor(height) + "px";
+        player.style.maxWidth = "100%";
+        player.style.maxHeight = "100%";
+        host.querySelectorAll(".vturb-player-placeholder, iframe, video").forEach(function (node) {
+          node.style.paddingTop = "0";
+          node.style.width = "100%";
+          node.style.height = "100%";
+          if (node.tagName === "VIDEO") node.style.objectFit = "cover";
+        });
+      }
+
+      function watchVturbPlayer() {
+        fitVturbPlayer();
+        var host = document.getElementById("videoHost");
+        if (!host) return;
+        var observer = new MutationObserver(fitVturbPlayer);
+        observer.observe(host, { childList: true, subtree: true, attributes: true });
+        window.addEventListener("resize", fitVturbPlayer);
+        var poll = setInterval(fitVturbPlayer, 400);
+        setTimeout(function () { clearInterval(poll); }, 10000);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", mountVturbPlayer);
+      } else {
+        mountVturbPlayer();
+      }
+      watchVturbPlayer();
+    })();
+  </script>
+</body>
+</html>
