@@ -22,13 +22,15 @@ import {
   type DfyFacebookPost,
   type DfyKitMeta,
 } from "@/features/dfy-profit/components/DfyResultPanel";
+import type { ArticleImage } from "@/types";
 
-type Stage = "idle" | "setup" | "craft" | "article" | "posts" | "done";
+type Stage = "idle" | "setup" | "craft" | "article" | "images" | "posts" | "done";
 
 const STAGE_LABELS: Record<Exclude<Stage, "idle" | "done">, string> = {
   setup: "Setting up your kit…",
   craft: "Writing your Craft article…",
   article: "Writing your authority article…",
+  images: "Generating header, mid, and conclusion images…",
   posts: "Generating Facebook posts…",
 };
 
@@ -47,12 +49,18 @@ export default function DfyProfitPage() {
   const [craftError, setCraftError] = useState("");
   const [articleError, setArticleError] = useState("");
   const [postsError, setPostsError] = useState("");
+  const [imagesError, setImagesError] = useState("");
   const [retryingCraft, setRetryingCraft] = useState(false);
   const [retryingArticle, setRetryingArticle] = useState(false);
   const [retryingPosts, setRetryingPosts] = useState(false);
+  const [retryingImages, setRetryingImages] = useState(false);
 
   const generating =
-    stage === "setup" || stage === "craft" || stage === "article" || stage === "posts";
+    stage === "setup" ||
+    stage === "craft" ||
+    stage === "article" ||
+    stage === "images" ||
+    stage === "posts";
 
   const runCraftStage = useCallback(
     async (siteId: string, ctx: string, name: string, nicheName: string, link: string) => {
@@ -95,10 +103,59 @@ export default function DfyProfitPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Article generation failed");
       return {
+        id: (data.id as string | null) ?? null,
         title: data.title as string,
         excerpt: data.excerpt as string,
         html: data.html as string,
       } satisfies DfyArticleResult;
+    },
+    []
+  );
+
+  const runImagesStage = useCallback(
+    async (craftResult: DfyCraftResult | null, articleResult: DfyArticleResult | null) => {
+      if (!craftResult && !articleResult) {
+        throw new Error("Generate an article before images");
+      }
+
+      const res = await fetch("/api/premium/dfy-profit/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          craft: craftResult
+            ? { id: craftResult.id, title: craftResult.title, content: craftResult.content }
+            : undefined,
+          authority: articleResult
+            ? { id: articleResult.id, title: articleResult.title, html: articleResult.html }
+            : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok && !data.craft && !data.authority) {
+        throw new Error(data.error || "Image generation failed");
+      }
+
+      const craftImages = (data.craft?.images ?? []) as ArticleImage[];
+      const authorityImages = (data.authority?.images ?? []) as ArticleImage[];
+      const authorityHtml =
+        typeof data.authority?.html === "string" ? (data.authority.html as string) : null;
+
+      const craftErr =
+        typeof data.craft?.error === "string" ? (data.craft.error as string) : "";
+      const authorityErr =
+        typeof data.authority?.error === "string" ? (data.authority.error as string) : "";
+      const combinedErr = [craftErr, authorityErr].filter(Boolean).join(" · ");
+
+      if (craftImages.length === 0 && authorityImages.length === 0 && (craftErr || authorityErr || data.error)) {
+        throw new Error(combinedErr || (data.error as string) || "Image generation failed");
+      }
+
+      return {
+        craftImages,
+        authorityImages,
+        authorityHtml,
+        warning: combinedErr,
+      };
     },
     []
   );
@@ -128,6 +185,7 @@ export default function DfyProfitPage() {
     setCraftError("");
     setArticleError("");
     setPostsError("");
+    setImagesError("");
     setKit(null);
     setCraft(null);
     setArticle(null);
@@ -139,6 +197,8 @@ export default function DfyProfitPage() {
     let name = "";
     let nicheName = "";
     let link = affiliateUrl;
+    let craftResult: DfyCraftResult | null = null;
+    let articleResult: DfyArticleResult | null = null;
 
     try {
       const startRes = await fetch("/api/premium/dfy-profit/start", {
@@ -166,7 +226,7 @@ export default function DfyProfitPage() {
 
     setStage("craft");
     try {
-      const craftResult = await runCraftStage(siteId, ctx, name, nicheName, link);
+      craftResult = await runCraftStage(siteId, ctx, name, nicheName, link);
       setCraft(craftResult);
     } catch (e) {
       setCraftError(e instanceof Error ? e.message : "Craft article generation failed");
@@ -174,10 +234,32 @@ export default function DfyProfitPage() {
 
     setStage("article");
     try {
-      const articleResult = await runArticleStage(siteId, ctx, name, nicheName);
+      articleResult = await runArticleStage(siteId, ctx, name, nicheName);
       setArticle(articleResult);
     } catch (e) {
       setArticleError(e instanceof Error ? e.message : "Article generation failed");
+    }
+
+    if (craftResult || articleResult) {
+      setStage("images");
+      try {
+        const imagesResult = await runImagesStage(craftResult, articleResult);
+        if (craftResult) {
+          craftResult = { ...craftResult, images: imagesResult.craftImages };
+          setCraft(craftResult);
+        }
+        if (articleResult) {
+          articleResult = {
+            ...articleResult,
+            html: imagesResult.authorityHtml ?? articleResult.html,
+            images: imagesResult.authorityImages,
+          };
+          setArticle(articleResult);
+        }
+        if (imagesResult.warning) setImagesError(imagesResult.warning);
+      } catch (e) {
+        setImagesError(e instanceof Error ? e.message : "Image generation failed");
+      }
     }
 
     setStage("posts");
@@ -230,6 +312,30 @@ export default function DfyProfitPage() {
     }
   };
 
+  const handleRetryImages = async () => {
+    if (!craft && !article) return;
+    setRetryingImages(true);
+    setImagesError("");
+    try {
+      const imagesResult = await runImagesStage(craft, article);
+      if (craft) {
+        setCraft({ ...craft, images: imagesResult.craftImages });
+      }
+      if (article) {
+        setArticle({
+          ...article,
+          html: imagesResult.authorityHtml ?? article.html,
+          images: imagesResult.authorityImages,
+        });
+      }
+      if (imagesResult.warning) setImagesError(imagesResult.warning);
+    } catch (e) {
+      setImagesError(e instanceof Error ? e.message : "Image generation failed");
+    } finally {
+      setRetryingImages(false);
+    }
+  };
+
   const handleRetryPosts = async () => {
     if (!kit?.siteId) return;
     setRetryingPosts(true);
@@ -247,7 +353,7 @@ export default function DfyProfitPage() {
   return (
     <PremiumPageLayout
       title="Done-For-You Profit"
-      subtitle="Paste your affiliate link, pick a niche, and get a Craft article, an authority article, and 3 Facebook posts in one run."
+      subtitle="Paste your affiliate link, pick a niche, and get a Craft article, an authority article, header/mid/conclusion images, and 3 Facebook posts in one run."
       footer={
         <PremiumFooter>
           Powered by {brand.productName}. The Craft article is saved to My Vault.
@@ -256,7 +362,7 @@ export default function DfyProfitPage() {
     >
       <PremiumVideoTutorial
         title="How to Use Done-For-You Profit"
-        description="Paste a link, pick a niche, generate your kit — Craft article, authority article, and three Facebook posts."
+        description="Paste a link, pick a niche, generate your kit — Craft article, authority article, images, and three Facebook posts."
         iframeTitle="Done-For-You Profit Tutorial"
         thumbnailSrc={getFeatureThumbnail("dfy-profit")}
       />
@@ -276,7 +382,7 @@ export default function DfyProfitPage() {
           {
             num: "3",
             title: "Generate your kit",
-            desc: "We create 1 Craft article, 1 authority article, and 3 Facebook posts.",
+            desc: "We create 1 Craft article, 1 authority article, 3 images each, and 3 Facebook posts.",
           },
         ]}
       />
@@ -284,7 +390,7 @@ export default function DfyProfitPage() {
       <PremiumControlCard
         icon={Wallet}
         title="Generate your kit"
-        description="One click creates a Craft article (saved to Vault), a long-form authority article, and 3 Facebook posts."
+        description="One click creates a Craft article (saved to Vault), a long-form authority article, header/mid/conclusion images, and 3 Facebook posts."
       >
         <div className="space-y-2">
           <span className="block text-sm font-medium text-text-primary">Affiliate link</span>
@@ -337,7 +443,11 @@ export default function DfyProfitPage() {
       <GenerationProgress
         active={generating}
         label={
-          stage === "setup" || stage === "craft" || stage === "article" || stage === "posts"
+          stage === "setup" ||
+          stage === "craft" ||
+          stage === "article" ||
+          stage === "images" ||
+          stage === "posts"
             ? STAGE_LABELS[stage]
             : "Generating…"
         }
@@ -351,15 +461,19 @@ export default function DfyProfitPage() {
         craftError={craftError}
         articleError={articleError}
         postsError={postsError}
+        imagesError={imagesError}
         isGeneratingCraft={stage === "craft"}
         isGeneratingArticle={stage === "article"}
         isGeneratingPosts={stage === "posts"}
+        isGeneratingImages={stage === "images"}
         retryingCraft={retryingCraft}
         retryingArticle={retryingArticle}
         retryingPosts={retryingPosts}
+        retryingImages={retryingImages}
         onRetryCraft={() => void handleRetryCraft()}
         onRetryArticle={() => void handleRetryArticle()}
         onRetryPosts={() => void handleRetryPosts()}
+        onRetryImages={() => void handleRetryImages()}
       />
     </PremiumPageLayout>
   );

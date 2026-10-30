@@ -65,7 +65,7 @@ export const faqSections: FaqSection[] = [
     items: [
       {
         q: "What is Done-For-You Profit?",
-        a: "Paste your affiliate link, pick a niche, and get a Craft article, an authority article, and 3 Facebook posts in one run.",
+        a: "Paste your affiliate link, pick a niche, and get a Craft article, an authority article, header/mid/conclusion images, and 3 Facebook posts in one run.",
       },
       {
         q: "What is Automated Profits?",

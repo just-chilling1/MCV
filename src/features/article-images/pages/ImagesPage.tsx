@@ -33,27 +33,13 @@ import { SaveStatusBar } from '@/components/ui/SaveStatusBar'
 import GenerationProgress from '@/components/ui/generation-progress'
 import EarningsBanner from '@/components/ui/earnings-banner'
 import { useScrollOnGenerationComplete } from '@/hooks/use-scroll-on-generation-complete'
+import {
+  ARTICLE_IMAGE_FRAMINGS,
+  ARTICLE_IMAGE_SLOTS,
+  buildArticleImagePrompt,
+} from '@/features/article-images/lib/article-image-slots'
 
-const imageSections = [
-  {
-    id: 'header',
-    section: 'Header Image',
-    suggestion: 'Professional hero image related to your topic',
-    position: 'top' as const,
-  },
-  {
-    id: 'mid',
-    section: 'Mid-Article Image',
-    suggestion: 'Data visualization or infographic',
-    position: 'middle' as const,
-  },
-  {
-    id: 'conclusion',
-    section: 'Conclusion Image',
-    suggestion: 'Call-to-action or engagement visual',
-    position: 'bottom' as const,
-  },
-]
+const imageSections = ARTICLE_IMAGE_SLOTS
 
 function stripHtml(content: string) {
   if (!content) return ''
@@ -234,10 +220,12 @@ export default function ImagesPage() {
   const handleGenerateImage = async (
     sectionId: string,
     slotIndex: number,
-    suggestion: string
+    _suggestion: string
   ) => {
     if (!currentArticle) return
     const slotId = `${sectionId}-${slotIndex}`
+    const slot = imageSections.find((s) => s.id === sectionId)
+    if (!slot) return
 
     setScrollTargetSlotId(slotId)
     setShowOfferBanner(true)
@@ -245,10 +233,12 @@ export default function ImagesPage() {
     setFailedSlotId(null)
 
     try {
-      // Keep prompts compact — long RapidAPI prompts often return empty / "Image not available".
-      const contentExcerpt = stripHtml(currentArticle.content).substring(0, 200)
-      const angles = ['wide shot', 'close detail', 'overhead view']
-      const prompt = `Photorealistic editorial photo, no text or letters in the frame. Topic: "${currentArticle.title}". Visual direction: ${suggestion}. Framing: ${angles[slotIndex] || 'wide shot'}. Context: ${contentExcerpt}. Cinematic lighting, sharp detail, modern, engaging.`
+      const prompt = buildArticleImagePrompt(
+        currentArticle.title,
+        currentArticle.content,
+        slot,
+        ARTICLE_IMAGE_FRAMINGS[slotIndex] || slot.framing
+      )
 
       const res = await fetchJson<{ url?: string }>('/api/generate-image', {
         method: 'POST',

@@ -427,6 +427,62 @@ async function generateImageBuffer(prompt: string): Promise<Buffer> {
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
+type ArticleImageStorage = {
+  storage: {
+    from: (bucket: string) => {
+      upload: (
+        path: string,
+        body: Buffer,
+        options?: { contentType?: string; upsert?: boolean }
+      ) => Promise<{ error: { message?: string } | null }>
+      getPublicUrl: (path: string) => { data: { publicUrl: string } }
+    }
+  }
+}
+
+/** Generate one image and store it in the article-images bucket. Shared by Visual Lab and DFY Profit. */
+export async function generateStoredArticleImage(
+  supabase: ArticleImageStorage,
+  userId: string,
+  prompt: string
+): Promise<string> {
+  const trimmed = prompt.trim().slice(0, 2800)
+  if (!trimmed) throw new Error('Missing required field: prompt')
+
+  if (
+    !process.env.GEMINI_API_KEY &&
+    !process.env.RAPIDAPI_KEY &&
+    !process.env.OPENAI_API_KEY
+  ) {
+    throw new Error(
+      'Image generation is not configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY + RAPIDAPI_IMAGE_HOST, or OPENAI_API_KEY.'
+    )
+  }
+
+  const buffer = await generateImageBuffer(trimmed)
+  const fileName = `${userId}/${uuidv4()}.png`
+
+  const { error: uploadError } = await supabase.storage
+    .from('article-images')
+    .upload(fileName, buffer, {
+      contentType: 'image/png',
+      upsert: false,
+    })
+
+  if (uploadError) {
+    console.error('Supabase Storage Error: Failed to save image:', uploadError)
+    throw new Error(
+      'Failed to save generated image to storage. Make sure the "article-images" bucket exists and RLS policies allow inserts.'
+    )
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from('article-images').getPublicUrl(fileName)
+
+  return publicUrl
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -444,59 +500,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const raw = typeof body.prompt === 'string' ? body.prompt : ''
-    /** Nano Banana / RapidAPI often rejects or empty-returns on very long prompts. */
-    const prompt = raw.trim().slice(0, 2800)
 
-    if (!prompt) {
-      return NextResponse.json(
-        { error: 'Missing required field: prompt' },
-        { status: 400 }
-      )
-    }
-
-    if (
-      !process.env.GEMINI_API_KEY &&
-      !process.env.RAPIDAPI_KEY &&
-      !process.env.OPENAI_API_KEY
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Image generation is not configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY + RAPIDAPI_IMAGE_HOST, or OPENAI_API_KEY.',
-        },
-        { status: 500 }
-      )
-    }
-
-    const buffer = await generateImageBuffer(prompt)
-
-    const fileName = `${user.id}/${uuidv4()}.png`
-
-    const { error: uploadError } = await supabase.storage
-      .from('article-images')
-      .upload(fileName, buffer, {
-        contentType: 'image/png',
-        upsert: false,
-      })
-
-    if (uploadError) {
-      console.error('Supabase Storage Error: Failed to save image:', uploadError)
-      return NextResponse.json(
-        {
-          error:
-            'Failed to save generated image to storage. Make sure the "article-images" bucket exists and RLS policies allow inserts.',
-        },
-        { status: 500 }
-      )
-    }
-
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('article-images').getPublicUrl(fileName)
-
-    return NextResponse.json({
-      url: publicUrl,
-    })
+    const url = await generateStoredArticleImage(supabase, user.id, raw)
+    return NextResponse.json({ url })
   } catch (error: unknown) {
     console.error('Image generation error:', error)
     if (error instanceof RapidApiFatalError && error.status === 429) {
@@ -509,6 +515,15 @@ export async function POST(request: NextRequest) {
       )
     }
     const detail = error instanceof Error ? error.message : String(error)
+    if (detail === 'Missing required field: prompt') {
+      return NextResponse.json({ error: detail }, { status: 400 })
+    }
+    if (detail.includes('Image generation is not configured')) {
+      return NextResponse.json({ error: detail }, { status: 500 })
+    }
+    if (detail.includes('Failed to save generated image to storage')) {
+      return NextResponse.json({ error: detail }, { status: 500 })
+    }
     return NextResponse.json({ error: `Backend Error: ${detail}` }, { status: 500 })
   }
 }

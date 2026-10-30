@@ -5,6 +5,7 @@ import {
   Check,
   Copy,
   FileText,
+  Image as ImageIcon,
   Loader2,
   Megaphone,
   PenLine,
@@ -16,6 +17,7 @@ import { GENERATION_RESULTS_ID } from "@/components/ui/generation-progress";
 import { ThreadListSection } from "@/features/publish-kit/components/ThreadListSection";
 import { sanitizePostHtml } from "@/features/blog-builder/lib/sanitize-html";
 import { copyToClipboard } from "@/lib/clipboard";
+import type { ArticleImage } from "@/types";
 
 export interface DfyKitMeta {
   siteId: string;
@@ -29,12 +31,15 @@ export interface DfyCraftResult {
   content: string;
   hook?: string | null;
   cta?: string | null;
+  images?: ArticleImage[];
 }
 
 export interface DfyArticleResult {
+  id: string | null;
   title: string;
   excerpt: string;
   html: string;
+  images?: ArticleImage[];
 }
 
 export interface DfyFacebookPost {
@@ -50,15 +55,19 @@ interface DfyResultPanelProps {
   craftError: string;
   articleError: string;
   postsError: string;
+  imagesError: string;
   isGeneratingCraft: boolean;
   isGeneratingArticle: boolean;
   isGeneratingPosts: boolean;
+  isGeneratingImages: boolean;
   retryingCraft: boolean;
   retryingArticle: boolean;
   retryingPosts: boolean;
+  retryingImages: boolean;
   onRetryCraft: () => void;
   onRetryArticle: () => void;
   onRetryPosts: () => void;
+  onRetryImages: () => void;
 }
 
 function htmlToPlainText(html: string) {
@@ -69,6 +78,33 @@ function htmlToPlainText(html: string) {
     .replace(/<[^>]+>/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function CraftImageThumbnails({ images }: { images: ArticleImage[] }) {
+  if (images.length === 0) return null;
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {images.map((img) => (
+        <a
+          key={img.id}
+          href={img.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="overflow-hidden rounded-xl border border-border-dim bg-field"
+        >
+          <div className="aspect-video w-full overflow-hidden bg-canvas">
+            <img
+              src={img.url}
+              alt={img.alt || img.section}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+          <p className="px-2.5 py-2 text-[12px] font-medium text-text-secondary">{img.section}</p>
+        </a>
+      ))}
+    </div>
+  );
 }
 
 function ArticlePreview({
@@ -127,15 +163,19 @@ export function DfyResultPanel({
   craftError,
   articleError,
   postsError,
+  imagesError,
   isGeneratingCraft,
   isGeneratingArticle,
   isGeneratingPosts,
+  isGeneratingImages,
   retryingCraft,
   retryingArticle,
   retryingPosts,
+  retryingImages,
   onRetryCraft,
   onRetryArticle,
   onRetryPosts,
+  onRetryImages,
 }: DfyResultPanelProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -149,6 +189,17 @@ export function DfyResultPanel({
     }
   }, []);
 
+  const craftImages = craft?.images ?? [];
+  const hasAnyImages =
+    craftImages.length > 0 || (article?.images?.length ?? 0) > 0 || Boolean(article?.html?.includes("data-article-image"));
+  const showImagesSection =
+    Boolean(kit) ||
+    Boolean(craft) ||
+    Boolean(article) ||
+    Boolean(imagesError) ||
+    isGeneratingImages ||
+    retryingImages;
+
   if (
     !kit &&
     !craft &&
@@ -156,7 +207,8 @@ export function DfyResultPanel({
     posts.length === 0 &&
     !craftError &&
     !articleError &&
-    !postsError
+    !postsError &&
+    !imagesError
   ) {
     return null;
   }
@@ -270,6 +322,70 @@ export function DfyResultPanel({
           />
         ) : null}
       </ThreadListSection>
+
+      {showImagesSection ? (
+        <ThreadListSection
+          title="Article images"
+          count={craftImages.length || undefined}
+          defaultOpen={hasAnyImages || Boolean(imagesError) || isGeneratingImages}
+        >
+          <div className="flex items-start gap-3">
+            <ImageIcon size={18} className="mt-0.5 shrink-0 text-success" />
+            <p className="text-sm text-text-secondary">
+              {hasAnyImages
+                ? "Header, mid-article, and conclusion images ready for Broadcast."
+                : imagesError ||
+                  (isGeneratingImages || retryingImages
+                    ? "Generating header, mid, and conclusion images…"
+                    : "Images appear here after both articles are written.")}
+            </p>
+          </div>
+          {isGeneratingImages || retryingImages ? (
+            <p className="inline-flex items-center gap-2 text-sm text-text-muted">
+              <Loader2 size={14} className="animate-spin" />
+              Generating header, mid, and conclusion images…
+            </p>
+          ) : imagesError && !hasAnyImages ? (
+            <button
+              type="button"
+              disabled={retryingImages || (!craft && !article)}
+              onClick={onRetryImages}
+              className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-50"
+            >
+              <RefreshCw size={14} />
+              Retry images
+            </button>
+          ) : (
+            <div className="space-y-4">
+              {craftImages.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[13px] font-medium text-text-primary">Craft article</p>
+                  <CraftImageThumbnails images={craftImages} />
+                </div>
+              ) : null}
+              {article?.html?.includes("data-article-image") || (article?.images?.length ?? 0) > 0 ? (
+                <p className="text-sm text-text-secondary">
+                  Authority article images are placed in the preview above.
+                </p>
+              ) : null}
+              {imagesError && hasAnyImages ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-warning">{imagesError}</p>
+                  <button
+                    type="button"
+                    disabled={retryingImages}
+                    onClick={onRetryImages}
+                    className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} />
+                    Retry images
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </ThreadListSection>
+      ) : null}
 
       <ThreadListSection
         title="Facebook posts"

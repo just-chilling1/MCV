@@ -70,7 +70,7 @@ export const FEATURE_CATALOG: FeatureMeta[] = [
   { id: "niche-finder", tier: "core", description: "Discover sub-niches and jump into product creation.", guide: "niche-finder" },
   { id: "comment-pack", tier: "core", description: "Gold Rush workflow: find videos → generate viral comment packs → share vault.", guide: "comment-pack" },
   { id: "premium-dfy", tier: "premium", description: "Done-for-you vault: pre-made keywords, articles, images, leads, or products.", guide: "premium-dfy" },
-  { id: "premium-dfy-profit", tier: "premium", description: "One-click kit: affiliate link + niche → Craft article, authority article, and 3 Facebook posts.", guide: "premium-dfy-profit" },
+  { id: "premium-dfy-profit", tier: "premium", description: "One-click kit: affiliate link + niche → Craft article, authority article, header/mid/conclusion images, and 3 Facebook posts.", guide: "premium-dfy-profit" },
   { id: "premium-instant", tier: "premium", description: "Pre-written social posts with images — copy and paste to Facebook.", guide: "premium-instant" },
   { id: "premium-autopilot", tier: "premium", description: "Share Craft articles and Links Library URLs across curated traffic sources.", guide: "premium-autopilot" },
   { id: "premium-accelerator", tier: "premium", description: "200 pre-made sales pages + X threads across all niches (seed once, clone on demand).", guide: "premium-accelerator" },

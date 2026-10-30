@@ -53,9 +53,13 @@ next-env.d.ts
 
 # training pipeline & heavy media (videos/audio hosted elsewhere)
 /training-video-system/
+/mobile-cash-vault-videos/
 /public/onboarding/
 *.mp3
 *.wav
 *.m4a
 *.mp4
 *.webm
+*.aac
+*.flac
+*.ogg
