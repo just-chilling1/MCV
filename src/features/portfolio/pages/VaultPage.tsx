@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -8,7 +8,6 @@ import {
   Search,
   Copy,
   Trash2,
-  MoreVertical,
   Clock,
   Check,
   Linkedin,
@@ -82,12 +81,10 @@ export default function MyPortfolioPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'published'>('all')
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [publishKitArticle, setPublishKitArticle] = useState<Article | null>(null)
   const [publishKitOpen, setPublishKitOpen] = useState(false)
-  const pendingDeletesRef = useRef<Map<string, number>>(new Map())
-  const menuRef = useRef<HTMLDivElement | null>(null)
 
   const enrichWithImages = (list: Article[]): Article[] => {
     const imageMap = useAppStore.getState().articleImages || {}
@@ -127,16 +124,6 @@ export default function MyPortfolioPage() {
     // ponytail: load once on mount; toast identity stable enough for vault hydrate
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!openMenu) return
-    const onPointer = (e: PointerEvent) => {
-      if (menuRef.current?.contains(e.target as Node)) return
-      setOpenMenu(null)
-    }
-    document.addEventListener('pointerdown', onPointer)
-    return () => document.removeEventListener('pointerdown', onPointer)
-  }, [openMenu])
 
   const counts = useMemo(() => {
     let draft = 0
@@ -178,45 +165,30 @@ export default function MyPortfolioPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const article = articles.find((a) => a.id === id)
-    if (!article) return
-    setOpenMenu(null)
+    if (!article || deletingId) return
 
+    setDeletingId(id)
     const snapshot = { ...article }
     setArticles((prev) => prev.filter((a) => a.id !== id))
     useAppStore.getState().deleteArticle(id)
 
-    const existing = pendingDeletesRef.current.get(id)
-    if (existing) clearTimeout(existing)
+    const res = await fetchJson(`/api/articles?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      retries: 0,
+    })
+    setDeletingId(null)
 
-    const timer = window.setTimeout(async () => {
-      pendingDeletesRef.current.delete(id)
-      const res = await fetchJson(`/api/articles?id=${id}`, { method: 'DELETE' })
-      if (res.ok) {
-        useAppStore.getState().deleteArticleImages(id)
-        return
-      }
+    if (!res.ok) {
       useAppStore.getState().addArticle(snapshot)
       setArticles((prev) => (prev.some((a) => a.id === id) ? prev : [snapshot, ...prev]))
       toast(res.error || 'Could not delete article', { variant: 'error' })
-    }, 10000)
+      return
+    }
 
-    pendingDeletesRef.current.set(id, timer)
-    toast('Article removed — undo within 10s', {
-      durationMs: 10000,
-      variant: 'default',
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          const t = pendingDeletesRef.current.get(id)
-          if (t) clearTimeout(t)
-          pendingDeletesRef.current.delete(id)
-          useAppStore.getState().addArticle(snapshot)
-          setArticles((prev) => (prev.some((a) => a.id === id) ? prev : [snapshot, ...prev]))
-        },
-      },
-    })
+    useAppStore.getState().deleteArticleImages(id)
+    toast('Article deleted', { variant: 'success' })
   }
 
   const handleDownloadImages = async (e: React.MouseEvent, article: Article) => {
@@ -375,41 +347,17 @@ export default function MyPortfolioPage() {
                               <LayoutGrid size={15} aria-hidden />
                               <span className="hidden sm:inline">Publish kit</span>
                             </Button>
-
-                            <div
-                              className="relative"
-                              ref={openMenu === article.id ? menuRef : undefined}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={deletingId === article.id}
+                              onClick={() => void handleDelete(article.id)}
+                              title="Delete article"
+                              aria-label="Delete article"
+                              className="text-error hover:bg-error/10 hover:text-error"
                             >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setOpenMenu(openMenu === article.id ? null : article.id)
-                                }
-                                title="More"
-                                aria-expanded={openMenu === article.id}
-                                aria-haspopup="menu"
-                              >
-                                <MoreVertical size={16} />
-                              </Button>
-
-                              {openMenu === article.id && (
-                                <div
-                                  role="menu"
-                                  className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-border-dim bg-raised py-1 shadow-xl"
-                                >
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => handleDelete(article.id)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-error hover:bg-error/10"
-                                  >
-                                    <Trash2 size={14} aria-hidden />
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                              <Trash2 size={16} />
+                            </Button>
                           </div>
                         </div>
 
