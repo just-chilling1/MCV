@@ -6,7 +6,7 @@ import { generateStoredArticleImage } from "@/app/api/generate-image/route";
 import {
   ARTICLE_IMAGE_SLOTS,
   articleImageFromSlot,
-  buildArticleImagePrompt,
+  buildDfyCraftImagePrompt,
 } from "@/features/article-images/lib/article-image-slots";
 import { placeArticleImages } from "@/features/dfy-profit/lib/place-article-images";
 import type { ArticleImage } from "@/types";
@@ -44,7 +44,7 @@ async function generateThreeImages(
 ): Promise<{ images: ArticleImage[]; error: string | null }> {
   const settled = await Promise.allSettled(
     ARTICLE_IMAGE_SLOTS.map(async (slot) => {
-      const prompt = buildArticleImagePrompt(title, content, slot);
+      const prompt = buildDfyCraftImagePrompt(title, content, slot);
       const url = await generateStoredArticleImage(supabase, userId, prompt);
       return articleImageFromSlot(slot, url, idPrefix);
     })
@@ -71,7 +71,7 @@ async function generateThreeImages(
   return { images, error: null };
 }
 
-/** Done-For-You Profit: embed Header / Mid / Conclusion images into article HTML. */
+/** Done-For-You Profit: embed Header / Mid / Conclusion images into the Craft article only. */
 export async function POST(request: Request) {
   const guard = featureApiGuard("premium-dfy-profit");
   if (guard) return guard;
@@ -83,113 +83,55 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const craft = parseArticle(body.craft);
-  const authority = parseArticle(body.authority);
 
-  if (!craft && !authority) {
+  if (!craft) {
     return NextResponse.json(
-      { error: "Provide craft and/or authority article content" },
+      { error: "Provide craft article content" },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
-  const response: {
-    craft?: { content: string; error?: string };
-    authority?: { html: string; error?: string };
-  } = {};
+  const { images, error } = await generateThreeImages(
+    supabase,
+    user.id,
+    craft.title,
+    craft.content,
+    craft.id || "craft"
+  );
 
-  if (craft) {
-    const { images, error } = await generateThreeImages(
-      supabase,
-      user.id,
-      craft.title,
-      craft.content,
-      craft.id || "craft"
-    );
-
-    if (error) {
-      response.craft = { content: craft.content, error };
-    } else {
-      const content = placeArticleImages(craft.content, images);
-
-      if (craft.id) {
-        const { error: saveError } = await supabase
-          .from("articles")
-          .update({
-            content,
-            images: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", craft.id)
-          .eq("user_id", user.id);
-
-        if (saveError) {
-          console.error("[dfy-profit/images] craft save failed", saveError);
-          response.craft = {
-            content,
-            error: saveError.message || "Images embedded but not saved to Vault",
-          };
-        } else {
-          response.craft = { content };
-        }
-      } else {
-        response.craft = { content };
-      }
-    }
-  }
-
-  if (authority) {
-    const { images, error } = await generateThreeImages(
-      supabase,
-      user.id,
-      authority.title,
-      authority.content,
-      authority.id || "authority"
-    );
-
-    if (error) {
-      response.authority = { html: authority.content, error };
-    } else {
-      const html = placeArticleImages(authority.content, images);
-
-      if (authority.id) {
-        const { error: saveError } = await supabase
-          .from("site_recurring_articles")
-          .update({ html })
-          .eq("id", authority.id)
-          .eq("user_id", user.id);
-
-        if (saveError) {
-          console.error("[dfy-profit/images] authority save failed", saveError);
-          response.authority = {
-            html,
-            error: saveError.message || "Images embedded but not saved to Offers Library",
-          };
-        } else {
-          response.authority = { html };
-        }
-      } else {
-        response.authority = { html };
-      }
-    }
-  }
-
-  const craftOk = Boolean(response.craft?.content?.includes("data-article-image"));
-  const authorityOk = Boolean(response.authority?.html?.includes("data-article-image"));
-  const bothFailed =
-    (craft ? !craftOk : true) &&
-    (authority ? !authorityOk : true) &&
-    Boolean(response.craft?.error || response.authority?.error);
-
-  if (bothFailed && (craft || authority)) {
-    const message =
-      response.craft?.error ||
-      response.authority?.error ||
-      "Image generation failed";
+  if (error) {
     return NextResponse.json(
-      { ...response, error: message },
+      { craft: { content: craft.content, error }, error },
       { status: 502, headers: NO_STORE_HEADERS }
     );
   }
 
-  return NextResponse.json(response, { headers: NO_STORE_HEADERS });
+  const content = placeArticleImages(craft.content, images);
+
+  if (craft.id) {
+    const { error: saveError } = await supabase
+      .from("articles")
+      .update({
+        content,
+        images: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", craft.id)
+      .eq("user_id", user.id);
+
+    if (saveError) {
+      console.error("[dfy-profit/images] craft save failed", saveError);
+      return NextResponse.json(
+        {
+          craft: {
+            content,
+            error: saveError.message || "Images embedded but not saved to Vault",
+          },
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+  }
+
+  return NextResponse.json({ craft: { content } }, { headers: NO_STORE_HEADERS });
 }

@@ -52,6 +52,22 @@ export function buildArticleImagePrompt(
   return `Photorealistic editorial photo, no text or letters in the frame. Topic: "${title}". Visual direction: ${slot.suggestion}. Framing: ${framing}. Context: ${excerpt}. Cinematic lighting, sharp detail, modern, engaging.`;
 }
 
+/** Tighter DFY Craft prompts — concrete subject, real setting; Images page keeps the generic builder. */
+export function buildDfyCraftImagePrompt(
+  title: string,
+  content: string,
+  slot: ArticleImageSlot
+): string {
+  const excerpt = stripHtmlForImagePrompt(content).substring(0, 160);
+  const direction =
+    slot.id === "header"
+      ? "Wide establishing scene: one concrete subject from the title in a real physical place"
+      : slot.id === "mid"
+        ? "Tight close-up of a tangible object or material detail tied to the topic"
+        : "Real-world outcome of using the product — a lived result in a real setting";
+  return `Photorealistic editorial photo. One concrete subject from "${title}". ${direction}. Framing: ${slot.framing}. Context: ${excerpt}. Natural light, sharp detail, specific not generic. No text, letters, logos, watermarks, floating coins, neon glow, or stock office blur.`;
+}
+
 export function articleImageFromSlot(
   slot: ArticleImageSlot,
   url: string,

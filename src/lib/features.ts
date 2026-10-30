@@ -31,7 +31,7 @@ export const PREMIUM_SECTION_LABEL = premiumSectionLabel;
 
 /** One-line descriptions keyed by route — shown in the dashboard Premium Upgrades widget. */
 const PREMIUM_DESCRIPTIONS: Record<string, string> = {
-  "/dfy-profit": "Affiliate link + niche → Craft article, authority article, images, and 3 Facebook posts.",
+  "/dfy-profit": "Affiliate link + niche → Craft article with images, authority article, and 3 Facebook posts.",
   "/autopilot": "Share Craft articles and Links Library URLs across curated traffic sources.",
   "/recurring-wealth": "100 ready-to-publish authority articles with your link.",
   "/social-payouts": "Bulk social posts from any offer — copy and paste.",

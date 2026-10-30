@@ -175,8 +175,7 @@ export function DfyResultPanel({
     isGeneratingImages ||
     retryingImages ||
     Boolean(imagesError) ||
-    Boolean(craft?.content.includes("data-article-image")) ||
-    Boolean(article?.html.includes("data-article-image"));
+    Boolean(craft?.content.includes("data-article-image"));
 
   return (
     <section id={GENERATION_RESULTS_ID} className="scroll-mt-24 space-y-4">
@@ -194,14 +193,14 @@ export function DfyResultPanel({
           {isGeneratingImages || retryingImages ? (
             <span className="inline-flex items-center gap-2">
               <Loader2 size={14} className="animate-spin" />
-              Embedding header, mid, and conclusion images into your articles…
+              Embedding header, mid, and conclusion images into your Craft article…
             </span>
           ) : imagesError ? (
             <>
               <span className="text-warning">{imagesError}</span>
               <button
                 type="button"
-                disabled={retryingImages || (!craft && !article)}
+                disabled={retryingImages || !craft}
                 onClick={onRetryImages}
                 className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-50"
               >
@@ -210,7 +209,7 @@ export function DfyResultPanel({
               </button>
             </>
           ) : (
-            <span>Header, mid, and conclusion images are embedded in the articles below.</span>
+            <span>Header, mid, and conclusion images are embedded in the Craft article below.</span>
           )}
         </div>
       ) : null}

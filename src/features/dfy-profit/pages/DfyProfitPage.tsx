@@ -29,7 +29,7 @@ const STAGE_LABELS: Record<Exclude<Stage, "idle" | "done">, string> = {
   setup: "Setting up your kit…",
   craft: "Writing your Craft article…",
   article: "Writing your authority article…",
-  images: "Generating header, mid, and conclusion images…",
+  images: "Generating Craft article images…",
   posts: "Generating Facebook posts…",
 };
 
@@ -111,54 +111,38 @@ export default function DfyProfitPage() {
     []
   );
 
-  const runImagesStage = useCallback(
-    async (craftResult: DfyCraftResult | null, articleResult: DfyArticleResult | null) => {
-      if (!craftResult && !articleResult) {
-        throw new Error("Generate an article before images");
-      }
+  const runImagesStage = useCallback(async (craftResult: DfyCraftResult) => {
+    const res = await fetch("/api/premium/dfy-profit/images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        craft: {
+          id: craftResult.id,
+          title: craftResult.title,
+          content: craftResult.content,
+        },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok && !data.craft) {
+      throw new Error(data.error || "Image generation failed");
+    }
 
-      const res = await fetch("/api/premium/dfy-profit/images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          craft: craftResult
-            ? { id: craftResult.id, title: craftResult.title, content: craftResult.content }
-            : undefined,
-          authority: articleResult
-            ? { id: articleResult.id, title: articleResult.title, html: articleResult.html }
-            : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok && !data.craft && !data.authority) {
-        throw new Error(data.error || "Image generation failed");
-      }
+    const craftContent =
+      typeof data.craft?.content === "string" ? (data.craft.content as string) : null;
+    const craftErr =
+      typeof data.craft?.error === "string" ? (data.craft.error as string) : "";
 
-      const craftContent =
-        typeof data.craft?.content === "string" ? (data.craft.content as string) : null;
-      const authorityHtml =
-        typeof data.authority?.html === "string" ? (data.authority.html as string) : null;
+    const craftOk = Boolean(craftContent?.includes("data-article-image"));
+    if (!craftOk && (craftErr || data.error)) {
+      throw new Error(craftErr || (data.error as string) || "Image generation failed");
+    }
 
-      const craftErr =
-        typeof data.craft?.error === "string" ? (data.craft.error as string) : "";
-      const authorityErr =
-        typeof data.authority?.error === "string" ? (data.authority.error as string) : "";
-      const combinedErr = [craftErr, authorityErr].filter(Boolean).join(" · ");
-
-      const craftOk = Boolean(craftContent?.includes("data-article-image"));
-      const authorityOk = Boolean(authorityHtml?.includes("data-article-image"));
-      if (!craftOk && !authorityOk && (craftErr || authorityErr || data.error)) {
-        throw new Error(combinedErr || (data.error as string) || "Image generation failed");
-      }
-
-      return {
-        craftContent,
-        authorityHtml,
-        warning: combinedErr,
-      };
-    },
-    []
-  );
+    return {
+      craftContent,
+      warning: craftErr,
+    };
+  }, []);
 
   const runPostsStage = useCallback(async (siteId: string) => {
     const res = await fetch("/api/premium/dfy-profit/posts", {
@@ -240,24 +224,15 @@ export default function DfyProfitPage() {
       setArticleError(e instanceof Error ? e.message : "Article generation failed");
     }
 
-    if (craftResult || articleResult) {
+    if (craftResult) {
       setStage("images");
       try {
-        const imagesResult = await runImagesStage(craftResult, articleResult);
-        if (craftResult) {
-          craftResult = {
-            ...craftResult,
-            content: imagesResult.craftContent ?? craftResult.content,
-          };
-          setCraft(craftResult);
-        }
-        if (articleResult) {
-          articleResult = {
-            ...articleResult,
-            html: imagesResult.authorityHtml ?? articleResult.html,
-          };
-          setArticle(articleResult);
-        }
+        const imagesResult = await runImagesStage(craftResult);
+        craftResult = {
+          ...craftResult,
+          content: imagesResult.craftContent ?? craftResult.content,
+        };
+        setCraft(craftResult);
         if (imagesResult.warning) setImagesError(imagesResult.warning);
       } catch (e) {
         setImagesError(e instanceof Error ? e.message : "Image generation failed");
@@ -315,23 +290,15 @@ export default function DfyProfitPage() {
   };
 
   const handleRetryImages = async () => {
-    if (!craft && !article) return;
+    if (!craft) return;
     setRetryingImages(true);
     setImagesError("");
     try {
-      const imagesResult = await runImagesStage(craft, article);
-      if (craft) {
-        setCraft({
-          ...craft,
-          content: imagesResult.craftContent ?? craft.content,
-        });
-      }
-      if (article) {
-        setArticle({
-          ...article,
-          html: imagesResult.authorityHtml ?? article.html,
-        });
-      }
+      const imagesResult = await runImagesStage(craft);
+      setCraft({
+        ...craft,
+        content: imagesResult.craftContent ?? craft.content,
+      });
       if (imagesResult.warning) setImagesError(imagesResult.warning);
     } catch (e) {
       setImagesError(e instanceof Error ? e.message : "Image generation failed");
@@ -357,7 +324,7 @@ export default function DfyProfitPage() {
   return (
     <PremiumPageLayout
       title="Done-For-You Profit"
-      subtitle="Paste your affiliate link, pick a niche, and get a Craft article, an authority article, header/mid/conclusion images, and 3 Facebook posts in one run."
+      subtitle="Paste your affiliate link, pick a niche, and get a Craft article with images, an authority article, and 3 Facebook posts in one run."
       footer={
         <PremiumFooter>
           Powered by {brand.productName}. The Craft article is saved to My Vault.
@@ -366,7 +333,7 @@ export default function DfyProfitPage() {
     >
       <PremiumVideoTutorial
         title="How to Use Done-For-You Profit"
-        description="Paste a link, pick a niche, generate your kit — Craft article, authority article, images, and three Facebook posts."
+        description="Paste a link, pick a niche, generate your kit — Craft article with images, authority article, and three Facebook posts."
         iframeTitle="Done-For-You Profit Tutorial"
         thumbnailSrc={getFeatureThumbnail("dfy-profit")}
       />
@@ -386,7 +353,7 @@ export default function DfyProfitPage() {
           {
             num: "3",
             title: "Generate your kit",
-            desc: "We create 1 Craft article, 1 authority article, 3 images each, and 3 Facebook posts.",
+            desc: "We create 1 Craft article with 3 images, 1 authority article, and 3 Facebook posts.",
           },
         ]}
       />
@@ -394,7 +361,7 @@ export default function DfyProfitPage() {
       <PremiumControlCard
         icon={Wallet}
         title="Generate your kit"
-        description="One click creates a Craft article (saved to Vault), a long-form authority article, header/mid/conclusion images, and 3 Facebook posts."
+        description="One click creates a Craft article with header/mid/conclusion images (saved to Vault), a long-form authority article, and 3 Facebook posts."
       >
         <div className="space-y-2">
           <span className="block text-sm font-medium text-text-primary">Affiliate link</span>
