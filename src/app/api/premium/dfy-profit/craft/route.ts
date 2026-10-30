@@ -87,6 +87,7 @@ export async function POST(request: Request) {
       affiliateLink: affiliateUrl || undefined,
       niche: nicheLabel || site.hobby || undefined,
       productInfo,
+      chat: { label: "dfy-craft", maxRetries: 2, timeoutMs: 75_000 },
     });
 
     const title = titleFromContent(generated.hook, topic);

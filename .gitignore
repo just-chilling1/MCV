@@ -46,6 +46,7 @@ next-env.d.ts
 
 # editor / agent local
 .agents/
+agents/
 .cursor/
 
 # repo maintenance scripts (not shipped)

@@ -436,7 +436,10 @@ function extractFeatures($: cheerio.CheerioAPI): string[] {
   return unique;
 }
 
-export async function scrapePage(url: string): Promise<ScrapedPageInfo | null> {
+export async function scrapePage(
+  url: string,
+  options?: { skipImageFallback?: boolean }
+): Promise<ScrapedPageInfo | null> {
   // Defense in depth — resolve DNS so private/link-local targets cannot slip through.
   let safeUrl: string;
   try {
@@ -450,7 +453,9 @@ export async function scrapePage(url: string): Promise<ScrapedPageInfo | null> {
 
   try {
     let imageUrl = extractPageImageUrl(html, safeUrl) ?? "";
-    if (!imageUrl) {
+    // Second rendered fetch is only to hunt an og:image. Callers that generate
+    // their own pictures (DFY Craft) skip it — it can add another 30s.
+    if (!imageUrl && !options?.skipImageFallback) {
       const rendered = await fetchScraperApiHtml(safeUrl);
       if (rendered) {
         const renderedImage = extractPageImageUrl(rendered, safeUrl);

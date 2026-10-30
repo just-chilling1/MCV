@@ -78,7 +78,9 @@ export async function POST(request: Request) {
   let scrapedTitle: string | undefined;
 
   try {
-    const scraped = await scrapePageWithCache(affiliateUrl, scrapeClient);
+    const scraped = await scrapePageWithCache(affiliateUrl, scrapeClient, {
+      skipImageFallback: true,
+    });
     productContext = scraped.context;
     scrapedTitle = scraped.data?.title;
   } catch {

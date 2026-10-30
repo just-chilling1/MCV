@@ -17,7 +17,8 @@ export interface ScrapeCacheResult {
 /** Scrape an affiliate URL with a shared Supabase cache (7-day TTL). */
 export async function scrapePageWithCache(
   url: string,
-  supabase: SupabaseClient | null
+  supabase: SupabaseClient | null,
+  options?: { skipImageFallback?: boolean }
 ): Promise<ScrapeCacheResult> {
   const key = urlKey(url);
   if (!key) return { data: null, context: "", cached: false };
@@ -42,7 +43,7 @@ export async function scrapePageWithCache(
     }
   }
 
-  const data = await scrapePage(url);
+  const data = await scrapePage(url, options);
   const context = data ? buildProductContext(data) : "";
 
   if (supabase && context) {

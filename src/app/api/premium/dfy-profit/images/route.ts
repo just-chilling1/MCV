@@ -49,7 +49,31 @@ async function generateSlotImage(
   return articleImageFromSlot(slot, url, idPrefix);
 }
 
-/** Header first, one retry per slot — parallel gens often drop the header to rate limits. */
+async function generateSlotWithRetry(
+  supabase: Parameters<typeof generateStoredArticleImage>[0],
+  userId: string,
+  title: string,
+  content: string,
+  slot: ArticleImageSlot,
+  idPrefix: string
+): Promise<ArticleImage> {
+  try {
+    return await generateSlotImage(supabase, userId, title, content, slot, idPrefix);
+  } catch (first) {
+    try {
+      return await generateSlotImage(supabase, userId, title, content, slot, idPrefix);
+    } catch (second) {
+      throw second instanceof Error ? second : first instanceof Error ? first : new Error(String(second));
+    }
+  }
+}
+
+/**
+ * Header first (parallel gens often drop it to rate limits), then mid and
+ * conclusion together.
+ * ponytail: two slots in parallel. Ceiling is a provider 429 dropping one of
+ * them; each slot still retries once. Upgrade path is a small queue if 429s climb.
+ */
 async function generateThreeImages(
   supabase: Parameters<typeof generateStoredArticleImage>[0],
   userId: string,
@@ -57,42 +81,36 @@ async function generateThreeImages(
   content: string,
   idPrefix: string
 ): Promise<{ images: ArticleImage[]; error: string | null }> {
-  const images: ArticleImage[] = [];
-  const failures: string[] = [];
+  const [headerSlot, ...rest] = ARTICLE_IMAGE_SLOTS;
+  if (!headerSlot) {
+    return { images: [], error: "Header image generation failed" };
+  }
 
-  for (const slot of ARTICLE_IMAGE_SLOTS) {
-    try {
-      images.push(await generateSlotImage(supabase, userId, title, content, slot, idPrefix));
-    } catch (first) {
+  let header: ArticleImage;
+  try {
+    header = await generateSlotWithRetry(supabase, userId, title, content, headerSlot, idPrefix);
+  } catch (err) {
+    return {
+      images: [],
+      error: err instanceof Error ? err.message : "Header image generation failed",
+    };
+  }
+
+  const restImages = await Promise.all(
+    rest.map(async (slot) => {
       try {
-        images.push(await generateSlotImage(supabase, userId, title, content, slot, idPrefix));
-      } catch (second) {
-        failures.push(
-          second instanceof Error
-            ? second.message
-            : first instanceof Error
-              ? first.message
-              : String(second)
-        );
+        return await generateSlotWithRetry(supabase, userId, title, content, slot, idPrefix);
+      } catch (err) {
+        console.error("[dfy-profit/images] slot failed", slot.id, err);
+        return null;
       }
-    }
-  }
+    })
+  );
 
-  if (!images.some((img) => img.position === "top")) {
-    return {
-      images: [],
-      error: failures[0] || "Header image generation failed",
-    };
-  }
-
-  if (images.length === 0) {
-    return {
-      images: [],
-      error: failures[0] || "Image generation failed for all slots",
-    };
-  }
-
-  return { images, error: null };
+  return {
+    images: [header, ...restImages.filter((img): img is ArticleImage => img !== null)],
+    error: null,
+  };
 }
 
 /** Done-For-You Profit: embed Header / Mid / Conclusion images into the Craft article only. */

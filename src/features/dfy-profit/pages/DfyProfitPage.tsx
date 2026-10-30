@@ -23,9 +23,12 @@ import {
   type DfyKitMeta,
 } from "@/features/dfy-profit/components/DfyResultPanel";
 
-type Stage = "idle" | "setup" | "craft" | "article" | "images" | "posts" | "done";
+type Job = "setup" | "craft" | "article" | "images" | "posts";
 
-const STAGE_LABELS: Record<Exclude<Stage, "idle" | "done">, string> = {
+/** Earliest in-flight job wins the progress label. Later jobs can already be running. */
+const JOB_ORDER: Job[] = ["setup", "craft", "article", "images", "posts"];
+
+const STAGE_LABELS: Record<Job, string> = {
   setup: "Setting up your kit…",
   craft: "Writing your Craft article…",
   article: "Writing your authority article…",
@@ -49,7 +52,7 @@ async function readApiJson(res: Response): Promise<Record<string, unknown>> {
 export default function DfyProfitPage() {
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [niche, setNiche] = useState("");
-  const [stage, setStage] = useState<Stage>("idle");
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState("");
   const [kit, setKit] = useState<DfyKitMeta | null>(null);
   const [craft, setCraft] = useState<DfyCraftResult | null>(null);
@@ -67,12 +70,8 @@ export default function DfyProfitPage() {
   const [retryingPosts, setRetryingPosts] = useState(false);
   const [retryingImages, setRetryingImages] = useState(false);
 
-  const generating =
-    stage === "setup" ||
-    stage === "craft" ||
-    stage === "article" ||
-    stage === "images" ||
-    stage === "posts";
+  const generating = jobs.length > 0;
+  const activeJob = JOB_ORDER.find((job) => jobs.includes(job));
 
   const runCraftStage = useCallback(
     async (siteId: string, ctx: string, name: string, nicheName: string, link: string) => {
@@ -191,15 +190,13 @@ export default function DfyProfitPage() {
     setCraft(null);
     setArticle(null);
     setPosts([]);
-    setStage("setup");
+    setJobs(["setup"]);
 
     let siteId = "";
     let ctx = "";
     let name = "";
     let nicheName = "";
     let link = affiliateUrl;
-    let craftResult: DfyCraftResult | null = null;
-    let articleResult: DfyArticleResult | null = null;
 
     try {
       const startRes = await fetch("/api/premium/dfy-profit/start", {
@@ -221,50 +218,64 @@ export default function DfyProfitPage() {
       setKit({ siteId, productName: name, niche: nicheName });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kit setup failed");
-      setStage("idle");
+      setJobs([]);
       return;
     }
 
-    setStage("craft");
-    try {
-      craftResult = await runCraftStage(siteId, ctx, name, nicheName, link);
-      setCraft(craftResult);
-    } catch (e) {
-      setCraftError(e instanceof Error ? e.message : "Craft article generation failed");
-    }
+    // Craft, authority, and posts only need the offer from setup. Images wait on Craft.
+    setJobs(["craft", "article", "posts"]);
 
-    setStage("article");
-    try {
-      articleResult = await runArticleStage(siteId, ctx, name, nicheName);
-      setArticle(articleResult);
-    } catch (e) {
-      setArticleError(e instanceof Error ? e.message : "Article generation failed");
-    }
+    const craftPromise = runCraftStage(siteId, ctx, name, nicheName, link)
+      .then((result) => {
+        setCraft(result);
+        setJobs((prev) => [...prev.filter((job) => job !== "craft"), "images"]);
+        return result;
+      })
+      .catch((e: unknown) => {
+        setCraftError(e instanceof Error ? e.message : "Craft article generation failed");
+        setJobs((prev) => prev.filter((job) => job !== "craft"));
+        return null;
+      });
 
-    if (craftResult) {
-      setStage("images");
+    const articlePromise = runArticleStage(siteId, ctx, name, nicheName)
+      .then((result) => {
+        setArticle(result);
+      })
+      .catch((e: unknown) => {
+        setArticleError(e instanceof Error ? e.message : "Article generation failed");
+      })
+      .finally(() => {
+        setJobs((prev) => prev.filter((job) => job !== "article"));
+      });
+
+    const postsPromise = runPostsStage(siteId)
+      .then((result) => {
+        setPosts(result);
+      })
+      .catch((e: unknown) => {
+        setPostsError(e instanceof Error ? e.message : "Facebook post generation failed");
+      })
+      .finally(() => {
+        setJobs((prev) => prev.filter((job) => job !== "posts"));
+      });
+
+    const imagesPromise = craftPromise.then(async (craftResult) => {
+      if (!craftResult) return;
       try {
         const imagesResult = await runImagesStage(craftResult);
-        craftResult = {
+        setCraft({
           ...craftResult,
           content: imagesResult.craftContent ?? craftResult.content,
-        };
-        setCraft(craftResult);
+        });
         if (imagesResult.warning) setImagesError(imagesResult.warning);
       } catch (e) {
         setImagesError(e instanceof Error ? e.message : "Image generation failed");
+      } finally {
+        setJobs((prev) => prev.filter((job) => job !== "images"));
       }
-    }
+    });
 
-    setStage("posts");
-    try {
-      const postsResult = await runPostsStage(siteId);
-      setPosts(postsResult);
-    } catch (e) {
-      setPostsError(e instanceof Error ? e.message : "Facebook post generation failed");
-    }
-
-    setStage("done");
+    await Promise.all([articlePromise, postsPromise, imagesPromise]);
   };
 
   const handleRetryCraft = async () => {
@@ -430,15 +441,7 @@ export default function DfyProfitPage() {
 
       <GenerationProgress
         active={generating}
-        label={
-          stage === "setup" ||
-          stage === "craft" ||
-          stage === "article" ||
-          stage === "images" ||
-          stage === "posts"
-            ? STAGE_LABELS[stage]
-            : "Generating…"
-        }
+        label={activeJob ? STAGE_LABELS[activeJob] : "Generating…"}
       />
 
       <DfyResultPanel
@@ -450,10 +453,10 @@ export default function DfyProfitPage() {
         articleError={articleError}
         postsError={postsError}
         imagesError={imagesError}
-        isGeneratingCraft={stage === "craft"}
-        isGeneratingArticle={stage === "article"}
-        isGeneratingPosts={stage === "posts"}
-        isGeneratingImages={stage === "images"}
+        isGeneratingCraft={jobs.includes("craft")}
+        isGeneratingArticle={jobs.includes("article")}
+        isGeneratingPosts={jobs.includes("posts")}
+        isGeneratingImages={jobs.includes("images")}
         retryingCraft={retryingCraft}
         retryingArticle={retryingArticle}
         retryingPosts={retryingPosts}

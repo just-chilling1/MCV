@@ -1,4 +1,9 @@
-import { callChatWithFallback, joinArticleSections, parseArticleJson } from "@/lib/rapidapi-chat";
+import {
+  callChatWithFallback,
+  joinArticleSections,
+  parseArticleJson,
+  type CallRapidChatOptions,
+} from "@/lib/rapidapi-chat";
 import { assertPublicHttpsUrlResolved } from "@/lib/safe-url";
 
 const TONE_PROMPTS: Record<string, string> = {
@@ -77,6 +82,8 @@ export interface GenerateCraftArticleInput {
   niche?: string;
   productInfo?: CraftProductInfo | null;
   customPrompt?: string;
+  /** DFY passes a shorter retry budget so a hung call falls back inside the route limit. */
+  chat?: Pick<CallRapidChatOptions, "maxRetries" | "timeoutMs" | "label">;
 }
 
 export interface GenerateCraftArticleResult {
@@ -247,7 +254,7 @@ Make the content compelling, valuable, and ready to publish immediately. Respond
       { role: "system", content: finalSystemPrompt },
       { role: "user", content: finalUserPrompt },
     ],
-    { label: "article", maxRetries: 5, timeoutMs: 120_000 }
+    { label: "article", maxRetries: 5, timeoutMs: 120_000, ...input.chat }
   );
   const parsed = parseArticleJson(result);
   const fullContent = joinArticleSections(parsed);
