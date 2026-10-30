@@ -30,7 +30,7 @@ export default function PremiumFeatureVideo({
           {thumb ? (
             <Image src={thumb} alt="" fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
           ) : null}
-          <span className="absolute inset-0 flex items-center justify-center bg-ink/25">
+          <span className="absolute inset-0 flex items-center justify-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-grad-brass text-brass-900 shadow-brass">
               <Play className="h-5 w-5" />
             </span>

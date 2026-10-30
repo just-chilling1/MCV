@@ -351,7 +351,7 @@ export default function MyPortfolioPage() {
                           </div>
 
                           <div
-                            className="flex shrink-0 flex-wrap items-center justify-end gap-1"
+                            className="flex shrink-0 flex-wrap items-center justify-end gap-2"
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
                           >
@@ -366,7 +366,7 @@ export default function MyPortfolioPage() {
                             </Button>
                             <Button
                               size="sm"
-                              className="gap-1.5 border border-border-dim bg-brass-100 text-brass-700 hover:bg-brass-200"
+                              className="!h-9 !min-h-0 shrink-0 gap-1.5 !px-3 !py-0"
                               onClick={() => {
                                 setPublishKitArticle(article)
                                 setPublishKitOpen(true)

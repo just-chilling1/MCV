@@ -337,7 +337,7 @@ export default function ArticleViewPage() {
           </Button>
           <Button
             size="sm"
-            className="gap-1.5 border border-info bg-brass-100 text-info hover:bg-brass-200"
+            className="!h-9 !min-h-0 gap-1.5 !px-3 !py-0"
             onClick={() => setPublishKitOpen(true)}
           >
             <LayoutGrid size={16} />
