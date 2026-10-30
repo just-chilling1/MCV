@@ -7,7 +7,7 @@ import { generateAuthorityArticleForSite } from "@/features/dfy-profit/lib/gener
 import { saveGeneratedAuthorityArticle } from "@/features/premium-recurring/lib/recurring-articles-vault";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const guard = featureApiGuard("premium-dfy-profit");

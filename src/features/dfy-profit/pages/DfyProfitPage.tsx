@@ -33,6 +33,19 @@ const STAGE_LABELS: Record<Exclude<Stage, "idle" | "done">, string> = {
   posts: "Generating Facebook posts…",
 };
 
+/** Avoid `res.json()` throwing on HTML/platform error pages like "An error occurred…". */
+async function readApiJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(snippet || `Request failed (${res.status})`);
+  }
+}
+
 export default function DfyProfitPage() {
   const [affiliateUrl, setAffiliateUrl] = useState("");
   const [niche, setNiche] = useState("");
@@ -74,8 +87,8 @@ export default function DfyProfitPage() {
           affiliateUrl: link,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Craft article generation failed");
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error((data.error as string) || "Craft article generation failed");
       return {
         id: (data.id as string | null) ?? null,
         title: data.title as string,
@@ -99,8 +112,8 @@ export default function DfyProfitPage() {
           niche: nicheName,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Article generation failed");
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error((data.error as string) || "Article generation failed");
       return {
         id: (data.id as string | null) ?? null,
         title: data.title as string,
@@ -123,17 +136,21 @@ export default function DfyProfitPage() {
         },
       }),
     });
-    const data = await res.json();
-    if (!res.ok && !data.craft) {
-      throw new Error(data.error || "Image generation failed");
+    const data = await readApiJson(res);
+    const craftPayload =
+      data.craft && typeof data.craft === "object"
+        ? (data.craft as Record<string, unknown>)
+        : null;
+    if (!res.ok && !craftPayload) {
+      throw new Error((data.error as string) || "Image generation failed");
     }
 
     const craftContent =
-      typeof data.craft?.content === "string" ? (data.craft.content as string) : null;
+      typeof craftPayload?.content === "string" ? (craftPayload.content as string) : null;
     const craftErr =
-      typeof data.craft?.error === "string" ? (data.craft.error as string) : "";
+      typeof craftPayload?.error === "string" ? (craftPayload.error as string) : "";
 
-    const craftOk = Boolean(craftContent?.includes("data-article-image"));
+    const craftOk = Boolean(craftContent?.includes('data-article-image="top"'));
     if (!craftOk && (craftErr || data.error)) {
       throw new Error(craftErr || (data.error as string) || "Image generation failed");
     }
@@ -150,8 +167,8 @@ export default function DfyProfitPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ siteId }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Facebook post generation failed");
+    const data = await readApiJson(res);
+    if (!res.ok) throw new Error((data.error as string) || "Facebook post generation failed");
     return (data.posts ?? []) as DfyFacebookPost[];
   }, []);
 
@@ -190,8 +207,8 @@ export default function DfyProfitPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ affiliateUrl, niche }),
       });
-      const startData = await startRes.json();
-      if (!startRes.ok) throw new Error(startData.error || "Kit setup failed");
+      const startData = await readApiJson(startRes);
+      if (!startRes.ok) throw new Error((startData.error as string) || "Kit setup failed");
 
       siteId = startData.siteId as string;
       ctx = (startData.productContext as string) || "";

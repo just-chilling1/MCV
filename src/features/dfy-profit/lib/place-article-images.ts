@@ -3,7 +3,8 @@ import type { ArticleImage } from "@/types";
 
 function imgHtml(image: ArticleImage): string {
   const alt = (image.alt || image.section || "").replace(/"/g, "&quot;");
-  return `<figure data-article-image="${image.position}"><img src="${image.url}" alt="${alt}" loading="lazy" /></figure>`;
+  const src = image.url.replace(/"/g, "&quot;");
+  return `<figure data-article-image="${image.position}"><img src="${src}" alt="${alt}" width="1200" height="630" loading="lazy" /></figure>`;
 }
 
 /**

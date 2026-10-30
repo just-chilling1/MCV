@@ -28,6 +28,8 @@ export async function generateAuthorityArticleForSite(
   const hobby = nicheLabel.trim() || territory;
   const topic = buildClusterTopics(territory, hobby)[0];
   const armedLinks = (site.armed_links ?? []) as ArmedLink[];
+  // Short AI budget so we hit local fallback before the route/platform times out
+  // (long authority retries were returning a non-JSON "An error occurred…" page).
   const content = await generateBlogPostContent({
     topic: topic.title,
     territory,
@@ -36,6 +38,7 @@ export async function generateAuthorityArticleForSite(
     affiliateContext: armedLinks.map((l) => `${l.label}: ${l.url}`).join("\n"),
     productContext,
     contentTier: "authority",
+    gptOptions: { maxRetries: 1, maxRepairAttempts: 0, timeoutMs: 40_000 },
   });
 
   const postId = crypto.randomUUID();

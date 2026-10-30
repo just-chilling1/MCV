@@ -1,4 +1,9 @@
-import { generateStructuredJSON, generateWithGPT, extractJsonFromText } from "./ai";
+import {
+  generateStructuredJSON,
+  generateWithGPT,
+  extractJsonFromText,
+  type GptCallOptions,
+} from "./ai";
 import {
   ARTICLE_SYSTEM_PROMPT,
   buildArticleUserPrompt,
@@ -19,6 +24,8 @@ export async function generateBlogPostContent(params: {
   productContext?: string;
   trendContext?: string;
   contentTier?: ContentTier;
+  /** Override GPT retries/timeouts (DFY uses a short budget so local fallback can run). */
+  gptOptions?: GptCallOptions;
 }): Promise<GeneratedPostContent> {
   const angle = params.angle ?? "pillar-guide";
   const tier = params.contentTier ?? "full";
@@ -60,6 +67,7 @@ export async function generateBlogPostContent(params: {
         temperature: 0.3,
         maxRetries: tier === "deploy" ? 2 : tier === "authority" ? 4 : 3,
         maxRepairAttempts: tier === "deploy" ? 1 : tier === "authority" ? 3 : 2,
+        ...params.gptOptions,
       },
     });
   } catch (err) {

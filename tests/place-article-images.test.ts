@@ -48,6 +48,7 @@ describe("placeArticleImages", () => {
     expect(endAt).toBeGreaterThan(midAt);
     expect(out.startsWith('<figure data-article-image="top">')).toBe(true);
     expect(out).toContain('src="https://cdn.example/header.png"');
+    expect(out).toContain('width="1200"');
     expect(out).toContain('src="https://cdn.example/mid.png"');
     expect(out).toContain('src="https://cdn.example/end.png"');
   });

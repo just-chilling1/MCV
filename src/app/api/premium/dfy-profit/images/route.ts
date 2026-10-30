@@ -7,6 +7,7 @@ import {
   ARTICLE_IMAGE_SLOTS,
   articleImageFromSlot,
   buildDfyCraftImagePrompt,
+  type ArticleImageSlot,
 } from "@/features/article-images/lib/article-image-slots";
 import { placeArticleImages } from "@/features/dfy-profit/lib/place-article-images";
 import type { ArticleImage } from "@/types";
@@ -35,6 +36,20 @@ function parseArticle(raw: unknown): ArticleInput | null {
   return { id, title: title || "Article", content };
 }
 
+async function generateSlotImage(
+  supabase: Parameters<typeof generateStoredArticleImage>[0],
+  userId: string,
+  title: string,
+  content: string,
+  slot: ArticleImageSlot,
+  idPrefix: string
+): Promise<ArticleImage> {
+  const prompt = buildDfyCraftImagePrompt(title, content, slot);
+  const url = await generateStoredArticleImage(supabase, userId, prompt);
+  return articleImageFromSlot(slot, url, idPrefix);
+}
+
+/** Header first, one retry per slot — parallel gens often drop the header to rate limits. */
 async function generateThreeImages(
   supabase: Parameters<typeof generateStoredArticleImage>[0],
   userId: string,
@@ -42,23 +57,32 @@ async function generateThreeImages(
   content: string,
   idPrefix: string
 ): Promise<{ images: ArticleImage[]; error: string | null }> {
-  const settled = await Promise.allSettled(
-    ARTICLE_IMAGE_SLOTS.map(async (slot) => {
-      const prompt = buildDfyCraftImagePrompt(title, content, slot);
-      const url = await generateStoredArticleImage(supabase, userId, prompt);
-      return articleImageFromSlot(slot, url, idPrefix);
-    })
-  );
-
   const images: ArticleImage[] = [];
   const failures: string[] = [];
-  for (const result of settled) {
-    if (result.status === "fulfilled") images.push(result.value);
-    else {
-      failures.push(
-        result.reason instanceof Error ? result.reason.message : String(result.reason)
-      );
+
+  for (const slot of ARTICLE_IMAGE_SLOTS) {
+    try {
+      images.push(await generateSlotImage(supabase, userId, title, content, slot, idPrefix));
+    } catch (first) {
+      try {
+        images.push(await generateSlotImage(supabase, userId, title, content, slot, idPrefix));
+      } catch (second) {
+        failures.push(
+          second instanceof Error
+            ? second.message
+            : first instanceof Error
+              ? first.message
+              : String(second)
+        );
+      }
     }
+  }
+
+  if (!images.some((img) => img.position === "top")) {
+    return {
+      images: [],
+      error: failures[0] || "Header image generation failed",
+    };
   }
 
   if (images.length === 0) {
@@ -107,6 +131,16 @@ export async function POST(request: Request) {
   }
 
   const content = placeArticleImages(craft.content, images);
+
+  if (!content.includes('data-article-image="top"')) {
+    return NextResponse.json(
+      {
+        craft: { content: craft.content, error: "Header image was not embedded" },
+        error: "Header image was not embedded",
+      },
+      { status: 502, headers: NO_STORE_HEADERS }
+    );
+  }
 
   if (craft.id) {
     const { error: saveError } = await supabase

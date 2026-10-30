@@ -2726,8 +2726,10 @@ html[data-sidebar="collapsed"] {
   }
 
   .recurring-article-body figure img {
-    @apply w-full object-cover;
-    max-height: 320px;
+    @apply block h-auto w-full object-cover;
+    max-height: 420px;
+    min-height: 12rem;
+    aspect-ratio: 16 / 9;
   }
 
   .recurring-article-body figcaption {
