@@ -22,7 +22,6 @@ import {
   type DfyFacebookPost,
   type DfyKitMeta,
 } from "@/features/dfy-profit/components/DfyResultPanel";
-import type { ArticleImage } from "@/types";
 
 type Stage = "idle" | "setup" | "craft" | "article" | "images" | "posts" | "done";
 
@@ -135,8 +134,8 @@ export default function DfyProfitPage() {
         throw new Error(data.error || "Image generation failed");
       }
 
-      const craftImages = (data.craft?.images ?? []) as ArticleImage[];
-      const authorityImages = (data.authority?.images ?? []) as ArticleImage[];
+      const craftContent =
+        typeof data.craft?.content === "string" ? (data.craft.content as string) : null;
       const authorityHtml =
         typeof data.authority?.html === "string" ? (data.authority.html as string) : null;
 
@@ -146,13 +145,14 @@ export default function DfyProfitPage() {
         typeof data.authority?.error === "string" ? (data.authority.error as string) : "";
       const combinedErr = [craftErr, authorityErr].filter(Boolean).join(" · ");
 
-      if (craftImages.length === 0 && authorityImages.length === 0 && (craftErr || authorityErr || data.error)) {
+      const craftOk = Boolean(craftContent?.includes("data-article-image"));
+      const authorityOk = Boolean(authorityHtml?.includes("data-article-image"));
+      if (!craftOk && !authorityOk && (craftErr || authorityErr || data.error)) {
         throw new Error(combinedErr || (data.error as string) || "Image generation failed");
       }
 
       return {
-        craftImages,
-        authorityImages,
+        craftContent,
         authorityHtml,
         warning: combinedErr,
       };
@@ -245,14 +245,16 @@ export default function DfyProfitPage() {
       try {
         const imagesResult = await runImagesStage(craftResult, articleResult);
         if (craftResult) {
-          craftResult = { ...craftResult, images: imagesResult.craftImages };
+          craftResult = {
+            ...craftResult,
+            content: imagesResult.craftContent ?? craftResult.content,
+          };
           setCraft(craftResult);
         }
         if (articleResult) {
           articleResult = {
             ...articleResult,
             html: imagesResult.authorityHtml ?? articleResult.html,
-            images: imagesResult.authorityImages,
           };
           setArticle(articleResult);
         }
@@ -319,13 +321,15 @@ export default function DfyProfitPage() {
     try {
       const imagesResult = await runImagesStage(craft, article);
       if (craft) {
-        setCraft({ ...craft, images: imagesResult.craftImages });
+        setCraft({
+          ...craft,
+          content: imagesResult.craftContent ?? craft.content,
+        });
       }
       if (article) {
         setArticle({
           ...article,
           html: imagesResult.authorityHtml ?? article.html,
-          images: imagesResult.authorityImages,
         });
       }
       if (imagesResult.warning) setImagesError(imagesResult.warning);

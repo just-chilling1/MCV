@@ -46,9 +46,16 @@ describe("placeArticleImages", () => {
     expect(headerAt).toBeGreaterThanOrEqual(0);
     expect(midAt).toBeGreaterThan(headerAt);
     expect(endAt).toBeGreaterThan(midAt);
+    expect(out.startsWith('<figure data-article-image="top">')).toBe(true);
     expect(out).toContain('src="https://cdn.example/header.png"');
     expect(out).toContain('src="https://cdn.example/mid.png"');
     expect(out).toContain('src="https://cdn.example/end.png"');
+  });
+
+  it("places a lone header when only the top image is provided", () => {
+    const out = placeArticleImages("<p>Only body.</p>", [images[0]]);
+    expect(out.startsWith("<figure data-article-image=\"top\">")).toBe(true);
+    expect(out).toContain("<p>Only body.</p>");
   });
 
   it("replaces prior placed figures on re-run", () => {

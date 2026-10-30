@@ -7,8 +7,9 @@ function imgHtml(image: ArticleImage): string {
 }
 
 /**
- * Insert header / mid / conclusion images into authority article HTML.
- * Header at the start, mid after the middle top-level block, conclusion at the end.
+ * Insert header / mid / conclusion images into article HTML as inline figures.
+ * Rebuilds the fragment so the header always lands first (cheerio .before on the
+ * first root child is unreliable in fragment mode).
  */
 export function placeArticleImages(html: string, images: ArticleImage[]): string {
   const byPos = {
@@ -23,30 +24,24 @@ export function placeArticleImages(html: string, images: ArticleImage[]): string
   $("figure[data-article-image]").remove();
 
   const roots = $.root().children().toArray();
+  const blocks: string[] = [];
+
+  if (byPos.top) blocks.push(imgHtml(byPos.top));
+
   if (roots.length === 0) {
-    const parts: string[] = [];
-    if (byPos.top) parts.push(imgHtml(byPos.top));
-    if (html.trim()) parts.push(html.trim());
-    if (byPos.middle) parts.push(imgHtml(byPos.middle));
-    if (byPos.bottom) parts.push(imgHtml(byPos.bottom));
-    return parts.join("\n");
+    if (html.trim()) blocks.push(html.trim());
+    if (byPos.middle) blocks.push(imgHtml(byPos.middle));
+    if (byPos.bottom) blocks.push(imgHtml(byPos.bottom));
+    return blocks.join("\n");
   }
 
-  if (byPos.top) {
-    $(roots[0]).before(imgHtml(byPos.top));
-  }
+  const midAfterIndex = Math.max(0, Math.floor(roots.length / 2) - 1);
+  roots.forEach((el, i) => {
+    blocks.push($.html(el) ?? "");
+    if (byPos.middle && i === midAfterIndex) blocks.push(imgHtml(byPos.middle));
+  });
 
-  if (byPos.middle) {
-    const midIndex = Math.floor(roots.length / 2);
-    const anchor = roots[Math.max(0, midIndex - 1)] ?? roots[0];
-    $(anchor).after(imgHtml(byPos.middle));
-  }
+  if (byPos.bottom) blocks.push(imgHtml(byPos.bottom));
 
-  if (byPos.bottom) {
-    const last = $.root().children().last();
-    if (last.length) last.after(imgHtml(byPos.bottom));
-    else $.root().append(imgHtml(byPos.bottom));
-  }
-
-  return $.root().html()?.trim() ?? html;
+  return blocks.join("\n");
 }

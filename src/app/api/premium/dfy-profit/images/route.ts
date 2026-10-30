@@ -71,7 +71,7 @@ async function generateThreeImages(
   return { images, error: null };
 }
 
-/** Done-For-You Profit: Header / Mid / Conclusion images for Craft + authority articles. */
+/** Done-For-You Profit: embed Header / Mid / Conclusion images into article HTML. */
 export async function POST(request: Request) {
   const guard = featureApiGuard("premium-dfy-profit");
   if (guard) return guard;
@@ -93,8 +93,8 @@ export async function POST(request: Request) {
   }
 
   const response: {
-    craft?: { images: ArticleImage[]; error?: string };
-    authority?: { images: ArticleImage[]; html: string; error?: string };
+    craft?: { content: string; error?: string };
+    authority?: { html: string; error?: string };
   } = {};
 
   if (craft) {
@@ -107,26 +107,32 @@ export async function POST(request: Request) {
     );
 
     if (error) {
-      response.craft = { images: [], error };
+      response.craft = { content: craft.content, error };
     } else {
+      const content = placeArticleImages(craft.content, images);
+
       if (craft.id) {
         const { error: saveError } = await supabase
           .from("articles")
-          .update({ images, updated_at: new Date().toISOString() })
+          .update({
+            content,
+            images: null,
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", craft.id)
           .eq("user_id", user.id);
 
         if (saveError) {
           console.error("[dfy-profit/images] craft save failed", saveError);
           response.craft = {
-            images,
-            error: saveError.message || "Images generated but not saved to Vault",
+            content,
+            error: saveError.message || "Images embedded but not saved to Vault",
           };
         } else {
-          response.craft = { images };
+          response.craft = { content };
         }
       } else {
-        response.craft = { images };
+        response.craft = { content };
       }
     }
   }
@@ -141,7 +147,7 @@ export async function POST(request: Request) {
     );
 
     if (error) {
-      response.authority = { images: [], html: authority.content, error };
+      response.authority = { html: authority.content, error };
     } else {
       const html = placeArticleImages(authority.content, images);
 
@@ -155,24 +161,24 @@ export async function POST(request: Request) {
         if (saveError) {
           console.error("[dfy-profit/images] authority save failed", saveError);
           response.authority = {
-            images,
             html,
-            error: saveError.message || "Images generated but not saved to Offers Library",
+            error: saveError.message || "Images embedded but not saved to Offers Library",
           };
         } else {
-          response.authority = { images, html };
+          response.authority = { html };
         }
       } else {
-        response.authority = { images, html };
+        response.authority = { html };
       }
     }
   }
 
+  const craftOk = Boolean(response.craft?.content?.includes("data-article-image"));
+  const authorityOk = Boolean(response.authority?.html?.includes("data-article-image"));
   const bothFailed =
-    (!craft || response.craft?.error) &&
-    (!authority || response.authority?.error) &&
-    (response.craft?.images.length ?? 0) === 0 &&
-    (response.authority?.images.length ?? 0) === 0;
+    (craft ? !craftOk : true) &&
+    (authority ? !authorityOk : true) &&
+    Boolean(response.craft?.error || response.authority?.error);
 
   if (bothFailed && (craft || authority)) {
     const message =
