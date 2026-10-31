@@ -40,32 +40,39 @@ export function stripHtmlForImagePrompt(content: string): string {
 
 export const ARTICLE_IMAGE_FRAMINGS = ["wide shot", "close detail", "overhead view"] as const;
 
+const IMAGE_QUALITY_GUARDRAILS =
+  "Natural light, sharp focus, rich color, shallow depth of field, editorial magazine quality. No text, letters, logos, watermarks, floating coins, neon glow, or generic stock office blur.";
+
 /** Keep prompts compact — long RapidAPI prompts often return empty / "Image not available". */
+function slotSceneDirection(slotId: ArticleImageSlot["id"]): string {
+  switch (slotId) {
+    case "header":
+      return "Wide establishing scene: one concrete subject from the title in a real physical place";
+    case "mid":
+      return "Tight close-up of a tangible object or material detail tied to the topic";
+    case "conclusion":
+      return "Real-world outcome related to the topic — a believable result in a real setting";
+  }
+}
+
+/** Visual Lab + DFY — concrete subject, slot-specific scene, quality guardrails. */
 export function buildArticleImagePrompt(
   title: string,
   content: string,
-  slot: Pick<ArticleImageSlot, "suggestion" | "framing">,
+  slot: Pick<ArticleImageSlot, "id" | "suggestion" | "framing">,
   framingOverride?: string
 ): string {
-  const excerpt = stripHtmlForImagePrompt(content).substring(0, 200);
+  const excerpt = stripHtmlForImagePrompt(content).substring(0, 160);
   const framing = framingOverride || slot.framing;
-  return `Photorealistic editorial photo, no text or letters in the frame. Topic: "${title}". Visual direction: ${slot.suggestion}. Framing: ${framing}. Context: ${excerpt}. Cinematic lighting, sharp detail, modern, engaging.`;
+  return `Photorealistic editorial photo. One concrete subject from "${title}". ${slotSceneDirection(slot.id)}. Framing: ${framing}. Context: ${excerpt}. ${IMAGE_QUALITY_GUARDRAILS}`;
 }
 
-/** Tighter DFY Craft prompts — concrete subject, real setting; Images page keeps the generic builder. */
 export function buildDfyCraftImagePrompt(
   title: string,
   content: string,
   slot: ArticleImageSlot
 ): string {
-  const excerpt = stripHtmlForImagePrompt(content).substring(0, 160);
-  const direction =
-    slot.id === "header"
-      ? "Wide establishing scene: one concrete subject from the title in a real physical place"
-      : slot.id === "mid"
-        ? "Tight close-up of a tangible object or material detail tied to the topic"
-        : "Real-world outcome of using the product — a lived result in a real setting";
-  return `Photorealistic editorial photo. One concrete subject from "${title}". ${direction}. Framing: ${slot.framing}. Context: ${excerpt}. Natural light, sharp detail, specific not generic. No text, letters, logos, watermarks, floating coins, neon glow, or stock office blur.`;
+  return buildArticleImagePrompt(title, content, slot);
 }
 
 export function articleImageFromSlot(

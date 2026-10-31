@@ -11,7 +11,6 @@ import {
 } from "@/config/training-content.config";
 import { isFeatureEnabled } from "@/config/features.config";
 import {
-  getAcademyMindsetThumbnail,
   getAcademyPlatformThumbnail,
   getAcademyPremiumThumbnail,
 } from "@/lib/video-thumbnails";
@@ -41,9 +40,9 @@ export function getPremiumTutorialVideos(): AcademyVideo[] {
 }
 
 export function getMindsetTutorialVideos(): AcademyVideo[] {
-  return trainingMindsetVideos.map((video, index) => ({
+  return trainingMindsetVideos.map((video) => ({
     ...video,
-    thumbnailSrc: getAcademyMindsetThumbnail(index),
+    thumbnailSrc: video.poster ?? null,
   }));
 }
 

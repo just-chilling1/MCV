@@ -81,6 +81,30 @@ async function payloadToBuffer(payload: ImagePayload): Promise<Buffer> {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+const GEMINI_IMAGE_TIMEOUT_MS = 45_000
+const BANANA_IMAGE_TIMEOUT_MS = 55_000
+const CHATGPT42_IMAGE_TIMEOUT_MS = 48_000
+const OPENAI_IMAGE_TIMEOUT_MS = 65_000
+
+function withImageTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)),
+      ms
+    )
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      }
+    )
+  })
+}
+
 /** Flatten top-level `data` object (common RapidAPI / provider pattern). */
 function flattenResponse(data: Record<string, unknown>): Record<string, unknown> {
   const out = { ...data }
@@ -127,8 +151,8 @@ async function pollRapidBananaOutput(
     'x-rapidapi-key': apiKey,
     'x-rapidapi-host': host,
   }
-  const maxPolls = 55
-  const intervalMs = 2000
+  const maxPolls = 40
+  const intervalMs = 1_000
 
   for (let i = 0; i < maxPolls; i++) {
     if (i > 0) await sleep(intervalMs)
@@ -285,15 +309,15 @@ async function callChatGpt42Image(prompt: string): Promise<Buffer> {
     'Content-Type': 'application/json',
   } as const
 
-  const endpoints = ['/texttoimage', '/texttoimage3']
+  const endpoints = ['/texttoimage3', '/texttoimage']
   let lastErr: string | null = null
 
   for (const path of endpoints) {
     const res = await fetch(`https://${host}${path}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ text: prompt, width: 1024, height: 1024 }),
-      signal: AbortSignal.timeout(110_000),
+      body: JSON.stringify({ text: prompt, width: 1024, height: 768 }),
+      signal: AbortSignal.timeout(CHATGPT42_IMAGE_TIMEOUT_MS),
     })
 
     if (res.status === 429 || res.status === 401 || res.status === 403) {
@@ -342,8 +366,11 @@ async function callGeminiImage(prompt: string): Promise<Buffer> {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+        },
       }),
-      signal: AbortSignal.timeout(110_000),
+      signal: AbortSignal.timeout(GEMINI_IMAGE_TIMEOUT_MS),
     }
   )
 
@@ -385,7 +412,7 @@ async function callOpenAIImage(prompt: string): Promise<Buffer> {
     prompt: prompt.slice(0, 4000),
     n: 1,
     size: '1024x1024',
-    quality: 'standard',
+    quality: 'hd',
     response_format: 'b64_json',
   })
 
@@ -396,35 +423,59 @@ async function callOpenAIImage(prompt: string): Promise<Buffer> {
   return Buffer.from(b64, 'base64')
 }
 
-/** Provider order: ChatGPT-42 (existing paid RapidAPI sub) → Gemini → custom RapidAPI host → OpenAI. */
+/**
+ * Fast path: race Gemini + Nano Banana + ChatGPT-42 when multiple are configured.
+ * ponytail: parallel calls may finish two jobs; ceiling is extra RapidAPI quota — upgrade path is a single-provider flag.
+ */
 async function generateImageBuffer(prompt: string): Promise<Buffer> {
-  const providers: Array<{ enabled: boolean; run: () => Promise<Buffer> }> = [
-    { enabled: !!process.env.RAPIDAPI_KEY, run: () => callChatGpt42Image(prompt) },
-    { enabled: !!process.env.GEMINI_API_KEY, run: () => callGeminiImage(prompt) },
-    {
-      enabled: !!process.env.RAPIDAPI_KEY && !!process.env.RAPIDAPI_IMAGE_HOST,
-      run: () => callRapidBananaImage(prompt),
-    },
-    { enabled: !!process.env.OPENAI_API_KEY, run: () => callOpenAIImage(prompt) },
-  ]
-
-  const active = providers.filter((p) => p.enabled)
-  if (active.length === 0) {
-    throw new Error(
-      'No image provider configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY + RAPIDAPI_IMAGE_HOST, or OPENAI_API_KEY.'
+  const fast: Array<() => Promise<Buffer>> = []
+  if (process.env.GEMINI_API_KEY) {
+    fast.push(() =>
+      withImageTimeout(callGeminiImage(prompt), GEMINI_IMAGE_TIMEOUT_MS, 'Gemini')
+    )
+  }
+  if (process.env.RAPIDAPI_KEY) {
+    fast.push(() =>
+      withImageTimeout(callRapidBananaImage(prompt), BANANA_IMAGE_TIMEOUT_MS, 'Nano Banana')
+    )
+    fast.push(() =>
+      withImageTimeout(callChatGpt42Image(prompt), CHATGPT42_IMAGE_TIMEOUT_MS, 'ChatGPT-42')
     )
   }
 
-  let lastErr: unknown = null
-  for (const provider of active) {
+  const hasOpenAI = !!process.env.OPENAI_API_KEY
+  if (fast.length === 0 && !hasOpenAI) {
+    throw new Error(
+      'No image provider configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY, or OPENAI_API_KEY.'
+    )
+  }
+
+  if (fast.length >= 2) {
     try {
-      return await provider.run()
+      return await Promise.any(fast.map((run) => run()))
     } catch (err) {
-      console.error('Image provider failed, trying next if available:', err)
-      lastErr = err
+      console.error('All parallel image providers failed, trying fallbacks:', err)
+    }
+  } else if (fast.length === 1) {
+    try {
+      return await fast[0]!()
+    } catch (err) {
+      console.error('Primary image provider failed, trying fallbacks:', err)
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+
+  if (hasOpenAI) {
+    try {
+      return await withImageTimeout(callOpenAIImage(prompt), OPENAI_IMAGE_TIMEOUT_MS, 'OpenAI')
+    } catch (err) {
+      console.error('OpenAI image fallback failed:', err)
+      throw err instanceof Error ? err : new Error(String(err))
+    }
+  }
+
+  throw new Error(
+    'Image generation failed on all configured providers. Wait a moment and try again.'
+  )
 }
 
 type ArticleImageStorage = {
@@ -455,7 +506,7 @@ export async function generateStoredArticleImage(
     !process.env.OPENAI_API_KEY
   ) {
     throw new Error(
-      'Image generation is not configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY + RAPIDAPI_IMAGE_HOST, or OPENAI_API_KEY.'
+      'Image generation is not configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY, or OPENAI_API_KEY.'
     )
   }
 

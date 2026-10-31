@@ -8,8 +8,26 @@ import { listXTagsForSite, saveXTagBatch } from "@/features/publish-kit/lib/x-ta
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const TWITTER_FORMAT =
-  "X/Twitter hashtags (e.g. #MarketingTips). Suggest 3-5 hashtags only — over-hashtagging hurts reach on X.";
+const TAG_FORMATS: Record<string, string> = {
+  linkedin:
+    "LinkedIn hashtags (include #, e.g. #Leadership). Suggest 3-5. Mix one broad hashtag with niche ones.",
+  quora:
+    "Quora topics (no #). Suggest 5-8 specific topics or question titles this article should be posted under.",
+  medium:
+    'Medium tags (no #, Title Case, e.g. "Leadership"). Suggest up to 5 tags people actually follow.',
+  reddit:
+    "Reddit flair and keywords (no #). Suggest 4-6 flair labels or keywords, plus 2-3 relevant subreddit names prefixed with r/.",
+  twitter:
+    "X/Twitter hashtags (include #, e.g. #MarketingTips). Suggest 3-5 hashtags only — over-hashtagging hurts reach on X.",
+  facebook: "Facebook hashtags (include #). Suggest 2-4.",
+};
+
+function tagFormat(platform: string): string {
+  return (
+    TAG_FORMATS[platform] ??
+    "discoverability labels for this platform. Suggest 4-6, using that platform's normal format."
+  );
+}
 
 export async function GET(request: Request) {
   const guard = featureApiGuard("article-publish");
@@ -58,28 +76,27 @@ export async function POST(request: Request) {
   const articleContent = typeof body.articleContent === "string" ? body.articleContent : "";
   const niche = typeof body.niche === "string" ? body.niche : "";
 
-  if (!siteId) {
-    return NextResponse.json({ error: "siteId is required" }, { status: 400, headers: NO_STORE_HEADERS });
-  }
-
   if (!articleTitle) {
     return NextResponse.json({ error: "Title is required" }, { status: 400, headers: NO_STORE_HEADERS });
   }
 
-  const { data: site } = await supabase
-    .from("sites")
-    .select("id")
-    .eq("id", siteId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  if (siteId) {
+    const { data: site } = await supabase
+      .from("sites")
+      .select("id")
+      .eq("id", siteId)
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  if (!site) {
-    return NextResponse.json({ error: "Site not found" }, { status: 404, headers: NO_STORE_HEADERS });
+    if (!site) {
+      return NextResponse.json({ error: "Site not found" }, { status: 404, headers: NO_STORE_HEADERS });
+    }
   }
 
   const contentSnippet = articleContent.replace(/<[^>]+>/g, " ").slice(0, 500);
+  const format = tagFormat(platform);
 
-  const userPrompt = `You are a social media growth expert. Based on the following product/website, suggest the best ${TWITTER_FORMAT}
+  const userPrompt = `You are a social media growth expert. Based on the following article, suggest the best ${format}
 
 Title: ${articleTitle}
 ${niche ? `Niche: ${niche}` : ""}
@@ -107,7 +124,7 @@ Respond ONLY with valid JSON in this exact format:
       tags = parsed.tags.filter((t) => t && typeof t.tag === "string" && t.tag.trim());
     }
 
-    if (tags.length > 0) {
+    if (siteId && tags.length > 0) {
       await saveXTagBatch(supabase, user.id, siteId, tags);
     }
 

@@ -4,6 +4,7 @@
  */
 
 import { faqSections } from "./faq.config";
+import { ACADEMY_MINDSET_THUMBNAILS } from "@/lib/video-thumbnails";
 
 export const trainingWorkflowSteps = [
   {
@@ -117,7 +118,7 @@ export const trainingPremiumVideos = [
 ] as const;
 
 /** Mindset companions — one per Academy feature (how-to first, then mindset) */
-export const trainingMindsetVideos = [
+const mindsetVideoDefs = [
   {
     id: "",
     badge: "Mindset",
@@ -189,6 +190,11 @@ export const trainingMindsetVideos = [
     duration: "3–5 min",
   },
 ] as const;
+
+export const trainingMindsetVideos = mindsetVideoDefs.map((video, index) => ({
+  ...video,
+  poster: ACADEMY_MINDSET_THUMBNAILS[index] ?? null,
+}));
 
 export const trainingContentReady = true;
 

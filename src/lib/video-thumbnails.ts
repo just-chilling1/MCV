@@ -142,10 +142,11 @@ export function resolveVideoThumbnail(
   videoId: string,
   fallbackSrc?: string | null
 ): string | null {
-  if (videoId) {
-    return getVideoThumbnailById(videoId) ?? fallbackSrc ?? null;
-  }
-  return fallbackSrc ?? null;
+  const explicit = fallbackSrc?.trim();
+  if (explicit) return explicit;
+  const id = videoId?.trim();
+  if (id) return getVideoThumbnailById(id) ?? null;
+  return null;
 }
 
 export function toEmbedUrl(videoUrl: string, autoplay = true): string {
