@@ -10,6 +10,10 @@ import {
   type ArticleImageSlot,
 } from "@/features/article-images/lib/article-image-slots";
 import { placeArticleImages } from "@/features/dfy-profit/lib/place-article-images";
+import {
+  saveCraftArticleToVault,
+  updateCraftArticleInVault,
+} from "@/features/dfy-profit/lib/save-craft-to-vault";
 import type { ArticleImage } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -160,30 +164,42 @@ export async function POST(request: Request) {
     );
   }
 
-  if (craft.id) {
-    const { error: saveError } = await supabase
-      .from("articles")
-      .update({
+  let articleId = craft.id;
+
+  try {
+    if (articleId) {
+      await updateCraftArticleInVault(supabase, user.id, articleId, {
         content,
         images: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", craft.id)
-      .eq("user_id", user.id);
-
-    if (saveError) {
-      console.error("[dfy-profit/images] craft save failed", saveError);
-      return NextResponse.json(
-        {
-          craft: {
-            content,
-            error: saveError.message || "Images embedded but not saved to Vault",
-          },
-        },
-        { headers: NO_STORE_HEADERS }
-      );
+      });
+    } else {
+      // Craft generation returned content without a Vault row — save now with images embedded.
+      const saved = await saveCraftArticleToVault(supabase, user.id, {
+        title: craft.title,
+        content,
+        images: null,
+      });
+      articleId = saved.id;
     }
+  } catch (saveError) {
+    console.error("[dfy-profit/images] craft save failed", saveError);
+    return NextResponse.json(
+      {
+        craft: {
+          id: articleId,
+          content,
+          error:
+            saveError instanceof Error
+              ? saveError.message
+              : "Images embedded but not saved to Vault",
+        },
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   }
 
-  return NextResponse.json({ craft: { content } }, { headers: NO_STORE_HEADERS });
+  return NextResponse.json(
+    { craft: { id: articleId, content } },
+    { headers: NO_STORE_HEADERS }
+  );
 }

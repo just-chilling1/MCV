@@ -16,6 +16,8 @@ export interface GptCallOptions {
   timeoutMs?: number;
   /** Lower = more deterministic JSON (0.2–0.4 recommended for structured output). */
   temperature?: number;
+  /** Cap completion length — keep small for fast suggest/tone calls. */
+  maxTokens?: number;
 }
 
 export function extractJsonFromText(text: string): unknown {
@@ -83,7 +85,7 @@ async function callChatGpt(
       messages: [{ role: "user", content: userPrompt }],
       system_prompt: systemPrompt,
       temperature: options.temperature ?? 0.9,
-      max_tokens: 4096,
+      max_tokens: options.maxTokens ?? 4096,
     }),
     signal: controller.signal,
   });
@@ -120,6 +122,9 @@ async function callGpt4(
 
   if (typeof options.temperature === "number") {
     body.temperature = options.temperature;
+  }
+  if (typeof options.maxTokens === "number") {
+    body.max_tokens = options.maxTokens;
   }
 
   const response = await fetch(`https://${RAPIDAPI_HOST}/gpt4`, {

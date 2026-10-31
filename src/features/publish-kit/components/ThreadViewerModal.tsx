@@ -73,7 +73,7 @@ function ThreadViewerContent({
       <button
         type="button"
         aria-label="Close thread viewer"
-        className="absolute inset-0 bg-ink/50 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
         onClick={onClose}
       />
 

@@ -1,5 +1,5 @@
 export const supportRoutes = {
-  contact: "/support",
+  contact: "/support#contact",
   /** @deprecated FAQ lives on the main support page */
   faq: "/support#faq",
 } as const;
@@ -12,9 +12,11 @@ export const support = {
   helpCenterUrl: "https://neoaifreshdesk.freshdesk.com",
   headline: "Need Help?",
   pageTitle: "Support",
-  pageSubtitle: "Documentation and assistance resources",
+  pageSubtitle: "Send a message below — we usually reply within about 2 hours",
   subcopy: "Our support team is here for you 24/7",
   ctaLabel: "Contact Support",
+  formHeading: "Contact Support",
+  formSubheading: "Fastest way to reach us — describe the issue and we'll reply by email.",
   floatingWidget: {
     label: "Need help?",
     panelTitle: "Need help?",

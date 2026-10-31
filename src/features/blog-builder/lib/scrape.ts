@@ -37,17 +37,26 @@ async function fetchDirectHtml(url: string): Promise<string | null> {
   return null;
 }
 
-async function fetchScraperApiHtml(url: string): Promise<string | null> {
+async function fetchScraperApiHtml(
+  url: string,
+  options?: { render?: boolean; premium?: boolean }
+): Promise<string | null> {
   const scraperApiKey = getScraperApiKey();
   if (!scraperApiKey) return null;
 
   try {
-    const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(
-      url
-    )}&render=true&premium=true`;
+    const params = new URLSearchParams({
+      api_key: scraperApiKey,
+      url,
+    });
+    if (options?.render) params.set("render", "true");
+    if (options?.premium) params.set("premium", "true");
+    const scraperUrl = `https://api.scraperapi.com?${params.toString()}`;
+    // JS render is slow (~15–30s); plain HTML fetch stays under ~10s.
+    const timeoutMs = options?.render ? SCRAPER_API_TIMEOUT_MS : 12_000;
     const res = await fetch(scraperUrl, {
       method: "GET",
-      signal: AbortSignal.timeout(SCRAPER_API_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (res.ok) return await res.text();
   } catch {
@@ -67,15 +76,18 @@ function htmlHasOfferSignals(html: string): boolean {
   );
 }
 
-/** Fetch raw HTML — direct request first (fast), ScraperAPI with JS render as fallback. */
+/** Fetch raw HTML — direct → ScraperAPI (no JS) → ScraperAPI JS render. */
 async function fetchHtml(url: string): Promise<string | null> {
   const direct = await fetchDirectHtml(url);
   if (direct && htmlHasOfferSignals(direct)) return direct;
 
-  const rendered = await fetchScraperApiHtml(url);
+  const plain = await fetchScraperApiHtml(url);
+  if (plain && htmlHasOfferSignals(plain)) return plain;
+
+  const rendered = await fetchScraperApiHtml(url, { render: true, premium: true });
   if (rendered) return rendered;
 
-  return direct;
+  return plain || direct;
 }
 
 type JsonLdNode = Record<string, unknown>;
@@ -456,7 +468,7 @@ export async function scrapePage(
     // Second rendered fetch is only to hunt an og:image. Callers that generate
     // their own pictures (DFY Craft) skip it — it can add another 30s.
     if (!imageUrl && !options?.skipImageFallback) {
-      const rendered = await fetchScraperApiHtml(safeUrl);
+      const rendered = await fetchScraperApiHtml(safeUrl, { render: true, premium: true });
       if (rendered) {
         const renderedImage = extractPageImageUrl(rendered, safeUrl);
         if (renderedImage) {

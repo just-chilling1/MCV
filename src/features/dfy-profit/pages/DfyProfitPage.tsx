@@ -88,13 +88,20 @@ export default function DfyProfitPage() {
       });
       const data = await readApiJson(res);
       if (!res.ok) throw new Error((data.error as string) || "Craft article generation failed");
-      return {
+      const result = {
         id: (data.id as string | null) ?? null,
         title: data.title as string,
         content: data.content as string,
         hook: data.hook as string | null | undefined,
         cta: data.cta as string | null | undefined,
       } satisfies DfyCraftResult;
+      if (!result.id) {
+        const warning =
+          (typeof data.saveWarning === "string" && data.saveWarning) ||
+          "Craft article was generated but not saved to My Vault. Retry Craft article.";
+        throw Object.assign(new Error(warning), { craftPreview: result });
+      }
+      return result;
     },
     []
   );
@@ -148,6 +155,10 @@ export default function DfyProfitPage() {
       typeof craftPayload?.content === "string" ? (craftPayload.content as string) : null;
     const craftErr =
       typeof craftPayload?.error === "string" ? (craftPayload.error as string) : "";
+    const craftId =
+      typeof craftPayload?.id === "string" && craftPayload.id.trim()
+        ? (craftPayload.id as string)
+        : null;
 
     const craftOk = Boolean(craftContent?.includes('data-article-image="top"'));
     if (!craftOk && (craftErr || data.error)) {
@@ -156,6 +167,7 @@ export default function DfyProfitPage() {
 
     return {
       craftContent,
+      craftId,
       warning: craftErr,
     };
   }, []);
@@ -232,9 +244,14 @@ export default function DfyProfitPage() {
         return result;
       })
       .catch((e: unknown) => {
+        const preview =
+          e && typeof e === "object" && "craftPreview" in e
+            ? (e as { craftPreview?: DfyCraftResult }).craftPreview
+            : undefined;
+        if (preview) setCraft(preview);
         setCraftError(e instanceof Error ? e.message : "Craft article generation failed");
         setJobs((prev) => prev.filter((job) => job !== "craft"));
-        return null;
+        return preview ?? null;
       });
 
     const articlePromise = runArticleStage(siteId, ctx, name, nicheName)
@@ -265,8 +282,10 @@ export default function DfyProfitPage() {
         const imagesResult = await runImagesStage(craftResult);
         setCraft({
           ...craftResult,
+          id: imagesResult.craftId ?? craftResult.id,
           content: imagesResult.craftContent ?? craftResult.content,
         });
+        if (imagesResult.craftId) setCraftError("");
         if (imagesResult.warning) setImagesError(imagesResult.warning);
       } catch (e) {
         setImagesError(e instanceof Error ? e.message : "Image generation failed");
@@ -292,6 +311,11 @@ export default function DfyProfitPage() {
       );
       setCraft(result);
     } catch (e) {
+      const preview =
+        e && typeof e === "object" && "craftPreview" in e
+          ? (e as { craftPreview?: DfyCraftResult }).craftPreview
+          : undefined;
+      if (preview) setCraft(preview);
       setCraftError(e instanceof Error ? e.message : "Craft article generation failed");
     } finally {
       setRetryingCraft(false);
@@ -325,8 +349,10 @@ export default function DfyProfitPage() {
       const imagesResult = await runImagesStage(craft);
       setCraft({
         ...craft,
+        id: imagesResult.craftId ?? craft.id,
         content: imagesResult.craftContent ?? craft.content,
       });
+      if (imagesResult.craftId) setCraftError("");
       if (imagesResult.warning) setImagesError(imagesResult.warning);
     } catch (e) {
       setImagesError(e instanceof Error ? e.message : "Image generation failed");

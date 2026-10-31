@@ -23,7 +23,7 @@ export function SupportCtaBanner({
   return (
     <section
       className={clsx(
-        "relative overflow-hidden rounded-2xl border border-border-dim bg-white shadow-sm",
+        "relative overflow-hidden rounded-2xl border border-[var(--mcv-line-brass)] bg-brass-100/40 shadow-sm",
         className
       )}
     >
@@ -40,7 +40,7 @@ export function SupportCtaBanner({
 
         <Link
           href={href}
-          className="btn-secondary w-full shrink-0 text-sm px-5 sm:w-auto border-silver-500 bg-silver-700 text-canvas hover:border-silver-700 hover:bg-[var(--mcv-silver-hover)] hover:text-canvas"
+          className="btn-primary w-full shrink-0 text-sm px-5 sm:w-auto"
         >
           {ctaLabel}
           <ArrowRight size={16} />

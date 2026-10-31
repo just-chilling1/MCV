@@ -23,26 +23,27 @@ export default function SupportPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-6"
       >
+        <motion.div variants={itemVariants} id="contact" className="scroll-mt-24">
+          <ContactSupportWidget featured />
+        </motion.div>
+
         <motion.div variants={itemVariants}>
           <SupportStatCards />
         </motion.div>
 
         <motion.div variants={itemVariants}>
+          <p className="mb-3 text-[13px] font-medium uppercase tracking-wide text-text-muted">
+            Other ways to reach us
+          </p>
           <SupportChannelCards />
         </motion.div>
 
-        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-          <div id="faq" className="card-base overflow-hidden p-0 lg:col-span-3">
-            <SupportFaqCardHeader />
-            <div className="px-4 py-4 sm:px-5">
-              <SupportFaqAccordion sections={faqSections} />
-            </div>
-          </div>
-
-          <div id="contact" className="lg:col-span-2">
-            <ContactSupportWidget />
+        <motion.div variants={itemVariants} id="faq" className="card-base scroll-mt-24 overflow-hidden p-0">
+          <SupportFaqCardHeader />
+          <div className="px-4 py-4 sm:px-5">
+            <SupportFaqAccordion sections={faqSections} />
           </div>
         </motion.div>
 

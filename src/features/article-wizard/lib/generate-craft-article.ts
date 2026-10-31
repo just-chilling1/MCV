@@ -4,7 +4,7 @@ import {
   parseArticleJson,
   type CallRapidChatOptions,
 } from "@/lib/rapidapi-chat";
-import { assertPublicHttpsUrlResolved } from "@/lib/safe-url";
+import { scrapePage } from "@/features/blog-builder/lib/scrape";
 
 const TONE_PROMPTS: Record<string, string> = {
   authoritative:
@@ -94,67 +94,16 @@ export interface GenerateCraftArticleResult {
 }
 
 export async function scrapeProductInfo(url: string): Promise<CraftProductInfo | null> {
-  const scraperApiKey = process.env.SCRAPER_API_KEY;
-  if (!scraperApiKey) return null;
-
   try {
-    const safeUrl = await assertPublicHttpsUrlResolved(url);
-    const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(safeUrl.toString())}&render=true`;
-    const response = await fetch(scraperUrl, {
-      method: "GET",
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!response.ok) return null;
-
-    const html = await response.text();
-
-    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/is);
-    const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "";
-
-    const metaDescMatch = html.match(
-      /<meta[^>]*name=["']description["'][^>]*content=["'](.*?)["']/is
-    );
-    const metaDescription = metaDescMatch
-      ? metaDescMatch[1].replace(/\s+/g, " ").trim()
-      : "";
-
-    const ogTitleMatch = html.match(
-      /<meta[^>]*property=["']og:title["'][^>]*content=["'](.*?)["']/is
-    );
-    const ogTitle = ogTitleMatch ? ogTitleMatch[1].replace(/\s+/g, " ").trim() : "";
-
-    const ogDescMatch = html.match(
-      /<meta[^>]*property=["']og:description["'][^>]*content=["'](.*?)["']/is
-    );
-    const ogDesc = ogDescMatch ? ogDescMatch[1].replace(/\s+/g, " ").trim() : "";
-
-    const priceMatch = html.match(/(?:price|سعر)[^<]*?(\d+[\.,]?\d*)/is);
-    const price = priceMatch ? priceMatch[1] : "";
-
-    const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/is);
-    const h1Text = h1Match
-      ? h1Match[1].replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
-      : "";
-
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/is);
-    let bodyText = "";
-    if (bodyMatch) {
-      bodyText = bodyMatch[1]
-        .replace(/<script[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[\s\S]*?<\/style>/gi, "")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .substring(0, 2000);
-    }
-
+    // Same fast path as /api/scrape-link — skip the slow JS-render image hunt.
+    const scraped = await scrapePage(url, { skipImageFallback: true });
+    if (!scraped) return null;
     return {
-      title: ogTitle || title || h1Text || "",
-      description: ogDesc || metaDescription || "",
-      h1: h1Text,
-      price,
-      bodySnippet: bodyText.substring(0, 500),
+      title: scraped.title || "",
+      description: scraped.description || "",
+      h1: scraped.h1 || "",
+      price: scraped.price || "",
+      bodySnippet: (scraped.bodySnippet || "").substring(0, 500),
     };
   } catch (err) {
     console.error("Scrape error in craft generator:", err);

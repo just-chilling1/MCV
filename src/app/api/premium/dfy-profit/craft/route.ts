@@ -5,6 +5,7 @@ import { NO_STORE_HEADERS } from "@/lib/api-cache-headers";
 import { isValidAffiliateUrl, normalizeAffiliateUrl } from "@/features/blog-builder/lib/affiliate-url";
 import { loadOwnedSite } from "@/features/blog-builder/lib/generation-pipeline";
 import { generateCraftArticle } from "@/features/article-wizard/lib/generate-craft-article";
+import { saveCraftArticleToVault } from "@/features/dfy-profit/lib/save-craft-to-vault";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -92,10 +93,8 @@ export async function POST(request: Request) {
 
     const title = titleFromContent(generated.hook, topic);
 
-    const { data: article, error: saveError } = await supabase
-      .from("articles")
-      .insert({
-        user_id: user.id,
+    try {
+      const article = await saveCraftArticleToVault(supabase, user.id, {
         title,
         content: generated.fullContent,
         affiliate_link: affiliateUrl || null,
@@ -103,15 +102,25 @@ export async function POST(request: Request) {
         platform: ["medium", "linkedin"],
         tone: "authoritative",
         length: "medium",
-        status: "draft",
         hook: generated.hook,
         cta: generated.cta,
-      })
-      .select()
-      .single();
+      });
 
-    if (saveError || !article) {
-      console.error("[dfy-profit/craft] save failed", saveError);
+      return NextResponse.json(
+        {
+          id: article.id,
+          title: article.title,
+          hook: article.hook,
+          cta: article.cta,
+          content: article.content,
+          niche: article.niche,
+          affiliate_link: article.affiliate_link,
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    } catch (saveErr) {
+      console.error("[dfy-profit/craft] save failed", saveErr);
+      // Keep generated copy for the UI, but id:null so the client won't claim Vault save.
       return NextResponse.json(
         {
           id: null,
@@ -119,24 +128,14 @@ export async function POST(request: Request) {
           hook: generated.hook,
           cta: generated.cta,
           content: generated.fullContent,
-          saveWarning: saveError?.message ?? "Article generated but not saved to Vault",
+          saveWarning:
+            saveErr instanceof Error
+              ? saveErr.message
+              : "Article generated but not saved to Vault",
         },
         { headers: NO_STORE_HEADERS }
       );
     }
-
-    return NextResponse.json(
-      {
-        id: article.id,
-        title: article.title,
-        hook: article.hook,
-        cta: article.cta,
-        content: article.content,
-        niche: article.niche,
-        affiliate_link: article.affiliate_link,
-      },
-      { headers: NO_STORE_HEADERS }
-    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Craft article generation failed";
     const status = message.includes("could not be formatted") ? 502 : 500;

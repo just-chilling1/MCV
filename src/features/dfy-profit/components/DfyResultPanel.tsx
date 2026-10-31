@@ -226,11 +226,15 @@ export function DfyResultPanel({
               {craft?.title || "Craft article"}
             </p>
             <p className="mt-1 text-sm text-text-secondary">
-              {craft
+              {craft?.id
                 ? "Saved to My Vault — edit or broadcast anytime."
-                : retryingCraft || isGeneratingCraft
-                  ? "Writing your Craft article…"
-                  : craftError || "Your Craft article will appear here."}
+                : craft && craftError
+                  ? craftError
+                  : craft
+                    ? "Generated — saving to My Vault…"
+                    : retryingCraft || isGeneratingCraft
+                      ? "Writing your Craft article…"
+                      : craftError || "Your Craft article will appear here."}
             </p>
           </div>
         </div>

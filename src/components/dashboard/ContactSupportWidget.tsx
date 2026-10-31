@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Headphones, Loader2, Mail, Send } from "lucide-react";
+import { CheckCircle2, Headphones, Loader2, Mail, Send, Sparkles } from "lucide-react";
 import { getCachedClientUser } from "@/lib/auth-client-cache";
 import { APP_SUPPORT_NAME, FREE_TRAINING_URL, SUPPORT_EMAIL } from "@/lib/support";
 import { copyToClipboard } from "@/lib/clipboard";
 import { trainingContent } from "@/config/training.config";
+import { support } from "@/config/support.config";
 import { supabase } from "@/lib/supabase";
 import { DashboardSection } from "./DashboardSection";
 
@@ -136,13 +137,31 @@ function SupportSuccessPanel({
   );
 }
 
-export function ContactSupportWidget({ embedded = false }: { embedded?: boolean }) {
+export function ContactSupportWidget({
+  embedded = false,
+  featured = false,
+}: {
+  embedded?: boolean;
+  /** Support page hero treatment — larger, brass-framed contact form. */
+  featured?: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [sentViaMailto, setSentViaMailto] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const emailFieldId = embedded
+    ? "support-email"
+    : featured
+      ? "support-page-email"
+      : "dashboard-support-email";
+  const messageFieldId = embedded
+    ? "support-message"
+    : featured
+      ? "support-page-message"
+      : "dashboard-support-message";
 
   useEffect(() => {
     void getCachedClientUser().then((user) => {
@@ -251,6 +270,18 @@ export function ContactSupportWidget({ embedded = false }: { embedded?: boolean 
   );
 
   if (formState === "success") {
+    if (featured) {
+      return (
+        <div className="support-contact-featured">
+          <SupportSuccessPanel
+            embedded={false}
+            submittedEmail={submittedEmail}
+            sentViaMailto={sentViaMailto}
+            onReset={resetForm}
+          />
+        </div>
+      );
+    }
     return (
       <SupportSuccessPanel
         embedded={embedded}
@@ -264,14 +295,11 @@ export function ContactSupportWidget({ embedded = false }: { embedded?: boolean 
   const formFields = (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
       <div className="min-w-0">
-        <label
-          htmlFor={embedded ? "support-email" : "dashboard-support-email"}
-          className={labelClass}
-        >
+        <label htmlFor={emailFieldId} className={labelClass}>
           Your email
         </label>
         <input
-          id={embedded ? "support-email" : "dashboard-support-email"}
+          id={emailFieldId}
           type="email"
           name="email"
           value={email}
@@ -284,22 +312,19 @@ export function ContactSupportWidget({ embedded = false }: { embedded?: boolean 
       </div>
 
       <div className="min-w-0">
-        <label
-          htmlFor={embedded ? "support-message" : "dashboard-support-message"}
-          className={labelClass}
-        >
+        <label htmlFor={messageFieldId} className={labelClass}>
           Your message
         </label>
         <textarea
-          id={embedded ? "support-message" : "dashboard-support-message"}
+          id={messageFieldId}
           name="message"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Tell us what you need help with..."
           required
           disabled={formState === "submitting"}
-          rows={3}
-          className={`${fieldClass} min-h-[96px] resize-y`}
+          rows={featured ? 6 : 3}
+          className={`${fieldClass} resize-y ${featured ? "min-h-[160px]" : "min-h-[96px]"}`}
         />
       </div>
 
@@ -320,7 +345,7 @@ export function ContactSupportWidget({ embedded = false }: { embedded?: boolean 
         <button
           type="submit"
           disabled={formState === "submitting"}
-          className={`btn-primary w-full shadow-brass ${embedded ? "min-h-[44px] py-2.5" : "min-h-[48px]"}`}
+          className={`btn-primary w-full shadow-brass ${featured ? "min-h-[52px] text-base" : embedded ? "min-h-[44px] py-2.5" : "min-h-[48px]"}`}
         >
           {formState === "submitting" ? (
             <span className="inline-flex items-center justify-center gap-2">
@@ -330,7 +355,7 @@ export function ContactSupportWidget({ embedded = false }: { embedded?: boolean 
           ) : (
             <span className="inline-flex items-center justify-center gap-2">
               <Send className="h-4 w-4 shrink-0" aria-hidden />
-              Send message
+              {featured ? "Send message to support" : "Send message"}
             </span>
           )}
         </button>
@@ -381,6 +406,43 @@ export function ContactSupportWidget({ embedded = false }: { embedded?: boolean 
           {mailtoFallback}
         </div>
       </div>
+    );
+  }
+
+  if (featured) {
+    return (
+      <section className="support-contact-featured" aria-labelledby="support-contact-heading">
+        <div className="support-contact-featured-header">
+          <div className="flex min-w-0 flex-1 items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--mcv-line-brass)] bg-brass-100">
+              <Headphones className="h-6 w-6 text-brass-700" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--mcv-line-brass)] bg-brass-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-brass-700">
+                <Sparkles className="h-3 w-3" aria-hidden />
+                Recommended
+              </div>
+              <h2 id="support-contact-heading" className="ds-h2 text-text-heading">
+                {support.formHeading}
+              </h2>
+              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
+                {support.formSubheading}
+              </p>
+            </div>
+          </div>
+          <p className="shrink-0 rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm font-medium text-success">
+            Avg reply under 2 hours
+          </p>
+        </div>
+
+        <div className="support-contact-featured-body">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+            {introCopy}
+            {formFields}
+            {mailtoFallback}
+          </div>
+        </div>
+      </section>
     );
   }
 

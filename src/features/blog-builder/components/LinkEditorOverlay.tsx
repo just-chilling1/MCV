@@ -95,11 +95,11 @@ export function LinkEditorOverlay({ open, initial, onSave, onClose }: LinkEditor
       <button
         type="button"
         aria-label="Close dialog"
-        className="absolute inset-0 bg-ink/50 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
         onClick={saving ? undefined : onClose}
       />
 
-      <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border-dim bg-white shadow-2xl">
+      <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--mcv-line-strong)] bg-raised shadow-2xl">
         <div className="flex items-center justify-between border-b border-border-dim/70 px-6 py-4">
           <h2 id="link-editor-title" className="brand-font text-xl text-text-heading">
             {initial ? "Edit Link" : "Create New Link"}
@@ -109,7 +109,7 @@ export function LinkEditorOverlay({ open, initial, onSave, onClose }: LinkEditor
             onClick={onClose}
             disabled={saving}
             aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-canvas hover:text-text-primary"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-brass-100 hover:text-text-primary"
           >
             <X size={18} />
           </button>

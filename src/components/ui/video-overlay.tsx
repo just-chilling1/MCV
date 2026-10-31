@@ -51,7 +51,7 @@ export function VideoOverlay({ open, onClose, videoUrl, title }: VideoOverlayPro
       <button
         type="button"
         aria-label="Close video"
-        className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 

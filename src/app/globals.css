@@ -1838,6 +1838,54 @@ html[data-sidebar="collapsed"] {
     box-shadow: var(--mcv-shadow-raised);
   }
 
+  /* Support page — featured contact form (primary action) */
+  .support-contact-featured {
+    overflow: hidden;
+    border-radius: var(--mcv-r-lg);
+    border: 1px solid var(--mcv-line-brass);
+    background:
+      linear-gradient(
+        165deg,
+        color-mix(in srgb, var(--mcv-brass-100) 55%, transparent) 0%,
+        var(--mcv-surface-raised) 42%,
+        var(--mcv-surface-raised) 100%
+      );
+    box-shadow: var(--mcv-shadow-brass), var(--mcv-shadow-raised);
+  }
+
+  .support-contact-featured-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--mcv-line-brass) 70%, transparent);
+  }
+
+  @media (min-width: 640px) {
+    .support-contact-featured-header {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 1.5rem 1.75rem 1.15rem;
+    }
+  }
+
+  .support-contact-featured-body {
+    padding: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .support-contact-featured-body {
+      padding: 1.5rem 1.75rem 1.75rem;
+    }
+  }
+
+  .support-contact-featured .support-success-panel {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
   .support-success-panel {
     border-radius: var(--mcv-r-lg);
     border: 1px solid var(--mcv-line-strong);

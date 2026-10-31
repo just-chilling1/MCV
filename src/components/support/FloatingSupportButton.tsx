@@ -24,7 +24,7 @@ export function FloatingSupportButton() {
         <button
           type="button"
           aria-label="Close support panel"
-          className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
       ) : null}

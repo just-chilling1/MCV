@@ -69,7 +69,7 @@ export function TemplatePreviewOverlay({
       <button
         type="button"
         aria-label="Close preview"
-        className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 

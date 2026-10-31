@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { supportRoutes } from "@/config/support.config";
 
 export default function Page() {
-  redirect(supportRoutes.contact);
+  // Contact form is the top of /support — hash fragments are unreliable in server redirects.
+  redirect("/support");
 }

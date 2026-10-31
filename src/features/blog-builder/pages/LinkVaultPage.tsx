@@ -184,7 +184,7 @@ export default function LinkVaultPage() {
                         </span>
                       )}
                       {link.tag && (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border-dim bg-field px-2 py-0.5 text-[11px] font-medium text-text-secondary">
                           <Tag size={10} />
                           {link.tag}
                         </span>
@@ -234,7 +234,7 @@ export default function LinkVaultPage() {
                       {linkedOffers.map((offer) => (
                         <span
                           key={offer.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-border-dim bg-white px-2.5 py-1 text-xs text-text-primary"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border-dim bg-field px-2.5 py-1 text-xs text-text-primary"
                         >
                           <Globe size={11} className="text-brass-700" />
                           {offer.title}

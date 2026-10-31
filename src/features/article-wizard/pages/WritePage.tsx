@@ -402,6 +402,7 @@ export default function CreateArticlePage() {
 
     setError('')
     setIsGenerating(true)
+    setSaved(false)
     setGeneratedArticle(null)
     setCurrentStep(3)
 
@@ -506,7 +507,6 @@ export default function CreateArticlePage() {
     }
 
     setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
   }
 
   return (
@@ -855,7 +855,10 @@ export default function CreateArticlePage() {
                   label="Topic / Headline"
                   placeholder="e.g., 5 Leadership Lessons from Building a $10M Startup"
                   value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  onChange={(e) => {
+                    setTopic(e.target.value)
+                    setSaved(false)
+                  }}
                 />
 
                 <button
@@ -881,7 +884,10 @@ export default function CreateArticlePage() {
                       <button
                         key={i}
                         type="button"
-                        onClick={() => setTopic(headline)}
+                        onClick={() => {
+                          setTopic(headline)
+                          setSaved(false)
+                        }}
                         className={`select-row w-full rounded-xl border p-3 text-left text-sm transition-all duration-200 ${
                           topic === headline
                             ? 'is-selected border-[var(--mcv-line-brass)] text-ink'
@@ -989,7 +995,10 @@ export default function CreateArticlePage() {
                   <div
                     contentEditable
                     suppressContentEditableWarning
-                    onInput={(e) => setEditedContent(e.currentTarget.innerHTML)}
+                    onInput={(e) => {
+                      setEditedContent(e.currentTarget.innerHTML)
+                      setSaved(false)
+                    }}
                     onClick={(e) => {
                       const target = e.target as HTMLElement
                       if (target.tagName.toLowerCase() === 'a') {
@@ -1040,9 +1049,9 @@ export default function CreateArticlePage() {
                     <span>Regenerate</span>
                   </Button>
 
-                  <Button onClick={handleSave} loading={isSaving} size="sm">
+                  <Button onClick={handleSave} loading={isSaving} size="sm" disabled={saved && !isSaving}>
                     {saved ? <Check size={14} /> : <Save size={14} />}
-                    <span>{saved ? 'Saved!' : isSaving ? 'Saving...' : 'Save Article'}</span>
+                    <span>{saved ? 'Saved' : isSaving ? 'Saving...' : 'Save Article'}</span>
                   </Button>
 
                   <Button
