@@ -1838,7 +1838,7 @@ html[data-sidebar="collapsed"] {
     box-shadow: var(--mcv-shadow-raised);
   }
 
-  /* Support page — contact form in original FAQ-adjacent slot, with gold glow */
+  /* Support page — contact form in original FAQ-adjacent slot, with green glow */
   .support-contact-glow {
     border-radius: var(--mcv-r-lg);
     animation: support-contact-glow-pulse 2.8s ease-in-out infinite;
@@ -1846,21 +1846,21 @@ html[data-sidebar="collapsed"] {
 
   .support-contact-glow > * {
     border-radius: inherit;
-    border-color: var(--mcv-line-brass) !important;
+    border-color: color-mix(in srgb, var(--mcv-success) 55%, var(--mcv-line-strong)) !important;
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--mcv-brass-500) 45%, transparent),
-      0 0 22px -4px rgba(212, 175, 55, 0.55),
-      0 0 48px -12px rgba(212, 175, 55, 0.35),
+      0 0 0 1px color-mix(in srgb, var(--mcv-success) 50%, transparent),
+      0 0 22px -4px rgba(54, 201, 130, 0.55),
+      0 0 48px -12px rgba(54, 201, 130, 0.35),
       var(--mcv-shadow-card);
   }
 
   @keyframes support-contact-glow-pulse {
     0%,
     100% {
-      filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.25));
+      filter: drop-shadow(0 0 6px rgba(54, 201, 130, 0.25));
     }
     50% {
-      filter: drop-shadow(0 0 14px rgba(212, 175, 55, 0.55));
+      filter: drop-shadow(0 0 14px rgba(54, 201, 130, 0.55));
     }
   }
 
