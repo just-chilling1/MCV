@@ -361,7 +361,12 @@ export default function CreateArticlePage() {
   }
 
   const handleSuggestTone = async () => {
+    if (!niche) {
+      setError('Please select a niche first')
+      return
+    }
     setIsSuggestingTone(true)
+    setError('')
     try {
       const nicheLabel = nicheOptions.find((n) => n.value === niche)?.label || niche
       const response = await fetch('/api/suggest-headlines', {
@@ -376,18 +381,24 @@ export default function CreateArticlePage() {
           topic,
         }),
       })
-      if (response.ok) {
-        const data = await response.json()
-        if (data.suggestedTone) {
-          const toneLower = data.suggestedTone.toLowerCase() as ArticleTone
-          if (['authoritative', 'conversational', 'bold'].includes(toneLower)) {
-            setTone(toneLower)
-            setSuggestedTone(toneLower)
-            setSuggestedToneReason(data.toneReason || 'Best fit for your niche and topic')
-          }
-        }
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Failed to suggest tone')
       }
+      const toneLower = String(data.suggestedTone || '').toLowerCase() as ArticleTone
+      if (!['authoritative', 'conversational', 'bold'].includes(toneLower)) {
+        throw new Error('Could not suggest a tone. Please try again.')
+      }
+      setTone(toneLower)
+      setSuggestedTone(toneLower)
+      setSuggestedToneReason(data.toneReason || 'Best fit for your niche and topic')
+      toast(`Tone set to ${toneLower.charAt(0).toUpperCase() + toneLower.slice(1)}`, {
+        variant: 'success',
+      })
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to suggest tone. Please try again.'
+      setError(msg)
+      toast(msg, { variant: 'error' })
       console.error('Tone suggestion failed:', err)
     } finally {
       setIsSuggestingTone(false)

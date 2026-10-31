@@ -323,8 +323,8 @@ export function ContactSupportWidget({
           placeholder="Tell us what you need help with..."
           required
           disabled={formState === "submitting"}
-          rows={featured ? 6 : 3}
-          className={`${fieldClass} resize-y ${featured ? "min-h-[160px]" : "min-h-[96px]"}`}
+          rows={3}
+          className={`${fieldClass} min-h-[96px] resize-y`}
         />
       </div>
 
@@ -345,7 +345,7 @@ export function ContactSupportWidget({
         <button
           type="submit"
           disabled={formState === "submitting"}
-          className={`btn-primary w-full shadow-brass ${featured ? "min-h-[52px] text-base" : embedded ? "min-h-[44px] py-2.5" : "min-h-[48px]"}`}
+          className={`btn-primary w-full shadow-brass ${embedded ? "min-h-[44px] py-2.5" : "min-h-[48px]"}`}
         >
           {formState === "submitting" ? (
             <span className="inline-flex items-center justify-center gap-2">
@@ -355,7 +355,7 @@ export function ContactSupportWidget({
           ) : (
             <span className="inline-flex items-center justify-center gap-2">
               <Send className="h-4 w-4 shrink-0" aria-hidden />
-              {featured ? "Send message to support" : "Send message"}
+              Send message
             </span>
           )}
         </button>
@@ -413,31 +413,30 @@ export function ContactSupportWidget({
     return (
       <section className="support-contact-featured" aria-labelledby="support-contact-heading">
         <div className="support-contact-featured-header">
-          <div className="flex min-w-0 flex-1 items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--mcv-line-brass)] bg-brass-100">
-              <Headphones className="h-6 w-6 text-brass-700" aria-hidden />
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--mcv-line-brass)] bg-brass-100">
+              <Headphones className="h-4 w-4 text-brass-700" aria-hidden />
             </div>
             <div className="min-w-0">
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--mcv-line-brass)] bg-brass-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-brass-700">
-                <Sparkles className="h-3 w-3" aria-hidden />
-                Recommended
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="support-contact-heading" className="ds-h3 text-text-heading">
+                  {support.formHeading}
+                </h2>
+                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--mcv-line-brass)] bg-brass-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brass-700">
+                  <Sparkles className="h-2.5 w-2.5" aria-hidden />
+                  Recommended
+                </span>
               </div>
-              <h2 id="support-contact-heading" className="ds-h2 text-text-heading">
-                {support.formHeading}
-              </h2>
-              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
-                {support.formSubheading}
-              </p>
+              <p className="mt-0.5 text-sm text-text-secondary">{support.formSubheading}</p>
             </div>
           </div>
-          <p className="shrink-0 rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm font-medium text-success">
+          <p className="shrink-0 rounded-md border border-success/25 bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
             Avg reply under 2 hours
           </p>
         </div>
 
         <div className="support-contact-featured-body">
-          <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-            {introCopy}
+          <div className="mx-auto flex w-full max-w-xl flex-col gap-3">
             {formFields}
             {mailtoFallback}
           </div>

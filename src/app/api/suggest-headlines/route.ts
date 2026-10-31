@@ -4,7 +4,10 @@ import { getApiUser } from "@/lib/api-auth";
 import { NO_STORE_HEADERS } from "@/lib/api-cache-headers";
 import { generateWithGPT } from "@/features/blog-builder/lib/ai";
 import { parseHeadlinesFromModel } from "@/features/publish-kit/lib/parse-headlines";
-import { parseSuggestedTone } from "@/features/article-wizard/lib/parse-suggested-tone";
+import {
+  fallbackSuggestedTone,
+  parseSuggestedTone,
+} from "@/features/article-wizard/lib/parse-suggested-tone";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,20 +41,21 @@ export async function POST(request: Request) {
 
   try {
     if (suggestTone) {
-      const raw = await generateWithGPT(
-        'Reply with JSON only: {"tone":"authoritative"|"conversational"|"bold","reason":"one short sentence"}',
-        `Pick the best article tone for niche "${niche}"${topic ? `, topic "${topic}"` : ""}${productLine ? `. ${productLine}` : ""}.`,
-        { temperature: 0.3, maxRetries: 2, maxTokens: 120, timeoutMs: 20_000 }
-      );
-
-      const toneResult = parseSuggestedTone(raw);
-      if (!toneResult) {
-        return NextResponse.json(
-          { error: "Could not suggest a tone" },
-          { status: 500, headers: NO_STORE_HEADERS }
+      try {
+        const raw = await generateWithGPT(
+          'Return ONLY JSON like {"tone":"authoritative","reason":"short why"}. tone must be one of: authoritative, conversational, bold.',
+          `Niche: ${niche}${topic ? `\nTopic: ${topic}` : ""}${productLine ? `\n${productLine}` : ""}\nPick the best writing tone.`,
+          { temperature: 0.2, maxRetries: 2, maxTokens: 200, timeoutMs: 25_000 }
         );
+
+        const toneResult = parseSuggestedTone(raw) ?? fallbackSuggestedTone(niche, topic || "");
+        return NextResponse.json(toneResult, { headers: NO_STORE_HEADERS });
+      } catch (toneErr) {
+        console.error("[suggest-headlines] tone AI failed, using fallback", toneErr);
+        return NextResponse.json(fallbackSuggestedTone(niche, topic || ""), {
+          headers: NO_STORE_HEADERS,
+        });
       }
-      return NextResponse.json(toneResult, { headers: NO_STORE_HEADERS });
     }
 
     const excludeList =
