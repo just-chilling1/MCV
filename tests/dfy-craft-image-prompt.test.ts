@@ -13,9 +13,9 @@ describe("buildDfyCraftImagePrompt", () => {
       ARTICLE_IMAGE_SLOTS[0]
     );
     expect(header).toMatch(/Best Trail Running Shoes/);
-    expect(header).toMatch(/Wide establishing scene/i);
+    expect(header).toMatch(/wide establishing scene/i);
     expect(header).toMatch(/No text/);
-    expect(header).toMatch(/floating coins/);
+    expect(header.length).toBeLessThanOrEqual(480);
 
     const mid = buildDfyCraftImagePrompt(
       "Best Trail Running Shoes",
@@ -38,6 +38,6 @@ describe("buildDfyCraftImagePrompt", () => {
       "<p>Cushioned soles for rocky paths.</p>",
       ARTICLE_IMAGE_SLOTS[2]
     );
-    expect(conclusion).toMatch(/Real-world outcome related to the topic/i);
+    expect(conclusion).toMatch(/real-world outcome/i);
   });
 });

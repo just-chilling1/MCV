@@ -40,6 +40,7 @@ function findImagePayload(val: unknown, depth = 0): ImagePayload | null {
   if (typeof val === 'object') {
     const o = val as Record<string, unknown>
     const priorityKeys = [
+      'generated_image',
       'image_base64',
       'base64',
       'imageBase64',
@@ -82,28 +83,9 @@ async function payloadToBuffer(payload: ImagePayload): Promise<Buffer> {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 const GEMINI_IMAGE_TIMEOUT_MS = 45_000
-const BANANA_IMAGE_TIMEOUT_MS = 55_000
-const CHATGPT42_IMAGE_TIMEOUT_MS = 48_000
-const OPENAI_IMAGE_TIMEOUT_MS = 65_000
-
-function withImageTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)),
-      ms
-    )
-    promise.then(
-      (value) => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      (err) => {
-        clearTimeout(timer)
-        reject(err)
-      }
-    )
-  })
-}
+const CHATGPT42_IMAGE_TIMEOUT_MS = 55_000
+const POLLINATIONS_TIMEOUT_MS = 45_000
+const CHATGPT42_MAX_ATTEMPTS = 3
 
 /** Flatten top-level `data` object (common RapidAPI / provider pattern). */
 function flattenResponse(data: Record<string, unknown>): Record<string, unknown> {
@@ -113,6 +95,14 @@ function flattenResponse(data: Record<string, unknown>): Record<string, unknown>
     Object.assign(out, inner as Record<string, unknown>)
   }
   return out
+}
+
+function isBusyImagePayload(data: Record<string, unknown>): boolean {
+  const flat = flattenResponse(data)
+  const status = flat.status
+  const err = String(flat.error || flat.message || '').toLowerCase()
+  if (status === false || status === 'false') return true
+  return /busy|rate.?limit|try again|temporarily|overload|congest/i.test(err)
 }
 
 function extractAsyncJobRef(data: Record<string, unknown>): { queryKey: string; id: string } | null {
@@ -289,16 +279,17 @@ async function callRapidBananaIndexPhp(
 }
 
 async function callRapidBananaImage(prompt: string): Promise<Buffer> {
-  const host =
-    process.env.RAPIDAPI_IMAGE_HOST || 'ultra-fast-nano-banana-22.p.rapidapi.com'
+  const host = process.env.RAPIDAPI_IMAGE_HOST?.trim()
+  if (!host) {
+    throw new Error('RAPIDAPI_IMAGE_HOST is not configured')
+  }
   const apiKey = process.env.RAPIDAPI_KEY!
-
-  return await callRapidBananaIndexPhp(prompt, host, apiKey)
+  return await callRapidBananaIndexPhp(prompt.slice(0, 500), host, apiKey)
 }
 
 /**
  * ChatGPT-42 on RapidAPI (rphrp1985) — same subscription used for article generation.
- * POST /texttoimage returns { generated_image: url } (DALLE-based model).
+ * POST /texttoimage3 returns { generated_image: url }. Retries on "server is busy".
  */
 async function callChatGpt42Image(prompt: string): Promise<Buffer> {
   const host = process.env.RAPIDAPI_HOST || 'chatgpt-42.p.rapidapi.com'
@@ -309,40 +300,84 @@ async function callChatGpt42Image(prompt: string): Promise<Buffer> {
     'Content-Type': 'application/json',
   } as const
 
+  const text = prompt.trim().slice(0, 500)
   const endpoints = ['/texttoimage3', '/texttoimage']
   let lastErr: string | null = null
 
-  for (const path of endpoints) {
-    const res = await fetch(`https://${host}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ text: prompt, width: 1024, height: 768 }),
-      signal: AbortSignal.timeout(CHATGPT42_IMAGE_TIMEOUT_MS),
-    })
+  for (let attempt = 1; attempt <= CHATGPT42_MAX_ATTEMPTS; attempt++) {
+    for (const path of endpoints) {
+      const res = await fetch(`https://${host}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ text, width: 1024, height: 768 }),
+        signal: AbortSignal.timeout(CHATGPT42_IMAGE_TIMEOUT_MS),
+      })
 
-    if (res.status === 429 || res.status === 401 || res.status === 403) {
-      const t = await res.text().catch(() => '')
-      throw new RapidApiFatalError(res.status, `${path} HTTP ${res.status}: ${t.slice(0, 300)}`)
-    }
+      if (res.status === 401 || res.status === 403) {
+        const t = await res.text().catch(() => '')
+        throw new RapidApiFatalError(res.status, `${path} HTTP ${res.status}: ${t.slice(0, 300)}`)
+      }
 
-    if (!res.ok) {
-      const t = await res.text().catch(() => '')
-      lastErr = `${path} HTTP ${res.status}: ${t.slice(0, 300)}`
+      if (res.status === 429) {
+        lastErr = `${path} HTTP 429`
+        break
+      }
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        lastErr = `${path} HTTP ${res.status}: ${t.slice(0, 300)}`
+        console.error('ChatGPT-42 image error:', lastErr)
+        continue
+      }
+
+      const json = (await res.json()) as Record<string, unknown>
+      if (isBusyImagePayload(json)) {
+        lastErr = `${path} busy: ${JSON.stringify(json).slice(0, 200)}`
+        console.warn('ChatGPT-42 image busy, will retry:', lastErr)
+        break
+      }
+
+      const payload = findImagePayload(json)
+      if (payload) {
+        return await payloadToBuffer(payload)
+      }
+
+      lastErr = `${path} returned no image: ${JSON.stringify(json).slice(0, 300)}`
       console.error('ChatGPT-42 image error:', lastErr)
-      continue
     }
 
-    const json = (await res.json()) as Record<string, unknown>
-    const payload = findImagePayload(json)
-    if (payload) {
-      return await payloadToBuffer(payload)
+    if (attempt < CHATGPT42_MAX_ATTEMPTS) {
+      await sleep(2_000 * attempt)
     }
-
-    lastErr = `${path} returned no image: ${JSON.stringify(json).slice(0, 300)}`
-    console.error('ChatGPT-42 image error:', lastErr)
   }
 
   throw new Error(lastErr || 'ChatGPT-42 image generation failed')
+}
+
+/** Free Pollinations fallback when RapidAPI image endpoints are busy / over quota. */
+async function callPollinationsImage(prompt: string): Promise<Buffer> {
+  const seed = Math.floor(Math.random() * 1_000_000)
+  const compact = prompt.trim().slice(0, 280)
+  const url =
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(compact)}` +
+    `?width=1024&height=768&nologo=true&seed=${seed}`
+
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(POLLINATIONS_TIMEOUT_MS),
+    redirect: 'follow',
+  })
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`Pollinations HTTP ${res.status}: ${t.slice(0, 200)}`)
+  }
+
+  const ct = res.headers.get('content-type') || ''
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (!ct.startsWith('image/') && buf.length < 8_000) {
+    throw new Error(`Pollinations returned no image: ${buf.toString('utf8').slice(0, 200)}`)
+  }
+  return buf
 }
 
 /**
@@ -424,58 +459,61 @@ async function callOpenAIImage(prompt: string): Promise<Buffer> {
 }
 
 /**
- * Fast path: race Gemini + Nano Banana + ChatGPT-42 when multiple are configured.
- * ponytail: parallel calls may finish two jobs; ceiling is extra RapidAPI quota — upgrade path is a single-provider flag.
+ * Sequential providers — ChatGPT-42 first (shared RapidAPI key), then optional hosts.
+ * Nano Banana only when RAPIDAPI_IMAGE_HOST is set (default host is often over monthly quota).
  */
 async function generateImageBuffer(prompt: string): Promise<Buffer> {
-  const fast: Array<() => Promise<Buffer>> = []
-  if (process.env.GEMINI_API_KEY) {
-    fast.push(() =>
-      withImageTimeout(callGeminiImage(prompt), GEMINI_IMAGE_TIMEOUT_MS, 'Gemini')
-    )
-  }
-  if (process.env.RAPIDAPI_KEY) {
-    fast.push(() =>
-      withImageTimeout(callRapidBananaImage(prompt), BANANA_IMAGE_TIMEOUT_MS, 'Nano Banana')
-    )
-    fast.push(() =>
-      withImageTimeout(callChatGpt42Image(prompt), CHATGPT42_IMAGE_TIMEOUT_MS, 'ChatGPT-42')
-    )
-  }
+  const providers: Array<{ label: string; enabled: boolean; run: () => Promise<Buffer> }> = [
+    {
+      label: 'ChatGPT-42',
+      enabled: !!process.env.RAPIDAPI_KEY,
+      run: () => callChatGpt42Image(prompt),
+    },
+    {
+      label: 'Gemini',
+      enabled: !!process.env.GEMINI_API_KEY,
+      run: () => callGeminiImage(prompt),
+    },
+    {
+      label: 'Nano Banana',
+      enabled: !!process.env.RAPIDAPI_KEY && !!process.env.RAPIDAPI_IMAGE_HOST?.trim(),
+      run: () => callRapidBananaImage(prompt),
+    },
+    {
+      label: 'OpenAI',
+      enabled: !!process.env.OPENAI_API_KEY,
+      run: () => callOpenAIImage(prompt),
+    },
+    {
+      label: 'Pollinations',
+      enabled: true,
+      run: () => callPollinationsImage(prompt),
+    },
+  ]
 
-  const hasOpenAI = !!process.env.OPENAI_API_KEY
-  if (fast.length === 0 && !hasOpenAI) {
+  const active = providers.filter((p) => p.enabled)
+  if (active.length === 0) {
     throw new Error(
       'No image provider configured. Set GEMINI_API_KEY (free at aistudio.google.com/apikey), or RAPIDAPI_KEY, or OPENAI_API_KEY.'
     )
   }
 
-  if (fast.length >= 2) {
+  let lastErr: unknown = null
+  for (const provider of active) {
     try {
-      return await Promise.any(fast.map((run) => run()))
+      return await provider.run()
     } catch (err) {
-      console.error('All parallel image providers failed, trying fallbacks:', err)
-    }
-  } else if (fast.length === 1) {
-    try {
-      return await fast[0]!()
-    } catch (err) {
-      console.error('Primary image provider failed, trying fallbacks:', err)
-    }
-  }
-
-  if (hasOpenAI) {
-    try {
-      return await withImageTimeout(callOpenAIImage(prompt), OPENAI_IMAGE_TIMEOUT_MS, 'OpenAI')
-    } catch (err) {
-      console.error('OpenAI image fallback failed:', err)
-      throw err instanceof Error ? err : new Error(String(err))
+      console.error(`Image provider ${provider.label} failed:`, err)
+      lastErr = err
+      if (err instanceof RapidApiFatalError && (err.status === 401 || err.status === 403)) {
+        continue
+      }
     }
   }
 
-  throw new Error(
-    'Image generation failed on all configured providers. Wait a moment and try again.'
-  )
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error('Image generation failed on all configured providers. Wait a moment and try again.')
 }
 
 type ArticleImageStorage = {
