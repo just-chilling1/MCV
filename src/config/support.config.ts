@@ -12,7 +12,7 @@ export const support = {
   helpCenterUrl: "https://neoaifreshdesk.freshdesk.com",
   headline: "Need Help?",
   pageTitle: "Support",
-  pageSubtitle: "Send a message below — we usually reply within about 2 hours",
+  pageSubtitle: "Documentation and assistance resources",
   subcopy: "Our support team is here for you 24/7",
   ctaLabel: "Contact Support",
   formHeading: "Contact Support",

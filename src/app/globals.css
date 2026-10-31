@@ -1838,46 +1838,45 @@ html[data-sidebar="collapsed"] {
     box-shadow: var(--mcv-shadow-raised);
   }
 
-  /* Support page — featured contact form (primary action) */
+  /* Support page — contact form in original FAQ-adjacent slot, with gold glow */
+  .support-contact-glow {
+    border-radius: var(--mcv-r-lg);
+    animation: support-contact-glow-pulse 2.8s ease-in-out infinite;
+  }
+
+  .support-contact-glow > * {
+    border-radius: inherit;
+    border-color: var(--mcv-line-brass) !important;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--mcv-brass-500) 45%, transparent),
+      0 0 22px -4px rgba(212, 175, 55, 0.55),
+      0 0 48px -12px rgba(212, 175, 55, 0.35),
+      var(--mcv-shadow-card);
+  }
+
+  @keyframes support-contact-glow-pulse {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.25));
+    }
+    50% {
+      filter: drop-shadow(0 0 14px rgba(212, 175, 55, 0.55));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .support-contact-glow {
+      animation: none;
+    }
+  }
+
+  /* Kept for success state if featured wrapper is still used elsewhere */
   .support-contact-featured {
     overflow: hidden;
     border-radius: var(--mcv-r-lg);
     border: 1px solid var(--mcv-line-brass);
-    background:
-      linear-gradient(
-        165deg,
-        color-mix(in srgb, var(--mcv-brass-100) 55%, transparent) 0%,
-        var(--mcv-surface-raised) 42%,
-        var(--mcv-surface-raised) 100%
-      );
+    background: var(--mcv-surface-raised);
     box-shadow: var(--mcv-shadow-brass), var(--mcv-shadow-raised);
-  }
-
-  .support-contact-featured-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.875rem 1rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--mcv-line-brass) 70%, transparent);
-  }
-
-  @media (min-width: 640px) {
-    .support-contact-featured-header {
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.25rem;
-    }
-  }
-
-  .support-contact-featured-body {
-    padding: 1rem;
-  }
-
-  @media (min-width: 640px) {
-    .support-contact-featured-body {
-      padding: 1rem 1.25rem 1.25rem;
-    }
   }
 
   .support-contact-featured .support-success-panel {
