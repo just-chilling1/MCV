@@ -77,15 +77,17 @@ export function BottomNav() {
                 key={tab.path}
                 href={tab.path}
                 className={clsx(
-                  "relative flex flex-1 flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors duration-200",
+                  "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors duration-200",
                   isActive ? "text-brass-700" : "text-ink-5 hover:text-ink"
                 )}
               >
                 {isActive ? (
                   <span className="absolute top-0 left-3 right-3 h-[3px] rounded-b-full bg-brass-700" />
                 ) : null}
-                <Icon className="h-6 w-6" />
-                <span className="text-[13px] font-medium leading-none">{tab.label}</span>
+                <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                <span className="max-w-full truncate px-0.5 text-[11px] font-medium leading-none sm:text-[13px]">
+                  {tab.label}
+                </span>
               </WarmNavLink>
             );
           })}
@@ -94,15 +96,17 @@ export function BottomNav() {
             type="button"
             onClick={() => setMoreOpen(true)}
             className={clsx(
-              "relative flex flex-1 flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors duration-200",
+              "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors duration-200",
               moreActive || moreOpen ? "text-brass-700" : "text-ink-5 hover:text-ink"
             )}
           >
             {(moreActive || moreOpen) ? (
               <span className="absolute top-0 left-3 right-3 h-[3px] rounded-b-full bg-grad-brass" />
             ) : null}
-            <Menu className="h-6 w-6" />
-            <span className="text-[13px] font-medium leading-none">More</span>
+            <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+            <span className="max-w-full truncate px-0.5 text-[11px] font-medium leading-none sm:text-[13px]">
+              More
+            </span>
           </button>
         </div>
       </nav>

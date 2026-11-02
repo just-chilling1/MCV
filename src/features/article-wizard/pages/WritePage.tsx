@@ -244,11 +244,14 @@ export default function CreateArticlePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ links: nextLinks }),
       })
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        links?: ArmedLink[]
+      }
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(data.error || 'Save failed')
       }
-      setVaultLinks(nextLinks)
+      setVaultLinks(Array.isArray(data.links) ? data.links : nextLinks)
       setAffiliateLink(url)
       setLinkSaved(true)
       invalidateClientFetchCache('/api/blog/link-vault')
@@ -457,7 +460,7 @@ export default function CreateArticlePage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     setIsSaving(true)
     setError('')
     const isUpdate = !!currentArticle?.id
@@ -505,7 +508,7 @@ export default function CreateArticlePage() {
       const msg = res.error || 'Failed to save article. Please try again.'
       setError(msg)
       toast(msg, { variant: 'error' })
-      return
+      return false
     }
 
     if (res.data.article) {
@@ -513,11 +516,12 @@ export default function CreateArticlePage() {
         useAppStore.getState().updateArticle(res.data.article.id, res.data.article)
       } else {
         useAppStore.getState().addArticle(res.data.article)
-        useAppStore.getState().setCurrentArticle(res.data.article)
       }
+      useAppStore.getState().setCurrentArticle(res.data.article)
     }
 
     setSaved(true)
+    return true
   }
 
   return (
@@ -528,18 +532,18 @@ export default function CreateArticlePage() {
         subtitle="Generate authority-building content in 3 simple steps"
       />
 
-      <nav className="mb-10 flex items-center gap-2 animate-fade-in" aria-label="Craft steps">
+      <nav className="mb-10 flex min-w-0 items-center gap-1 animate-fade-in sm:gap-2" aria-label="Craft steps">
         {steps.map((step, index) => (
-          <div key={step.number} className="flex flex-1 items-center">
-            <div className="flex flex-1 items-center gap-3">
+          <div key={step.number} className="flex min-w-0 flex-1 items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 ${stepCircleClass(currentStep, step.number)}`}
               >
                 {currentStep > step.number ? <Check size={16} /> : step.number}
               </div>
-              <div className="hidden min-w-0 sm:block">
+              <div className="hidden min-w-0 md:block">
                 <p
-                  className={`text-sm font-medium ${currentStep >= step.number ? 'text-ink' : 'text-text-muted'}`}
+                  className={`truncate text-sm font-medium ${currentStep >= step.number ? 'text-ink' : 'text-text-muted'}`}
                 >
                   {step.title}
                 </p>
@@ -548,7 +552,7 @@ export default function CreateArticlePage() {
             </div>
             {index < steps.length - 1 && (
               <div
-                className={`mx-3 h-px flex-1 transition-colors duration-300 ${
+                className={`mx-1 h-px min-w-2 flex-1 transition-colors duration-300 sm:mx-3 ${
                   currentStep > step.number ? 'bg-brass-500/50' : 'bg-border-dim'
                 }`}
               />
@@ -599,7 +603,7 @@ export default function CreateArticlePage() {
 
               {showInstructions && (
                 <div className="mt-5 space-y-5">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {affiliatePlatforms.map((platform) => {
                       const isSelected = selectedAffiliatePlatform === platform.value
                       return (
@@ -1068,11 +1072,15 @@ export default function CreateArticlePage() {
                   <Button
                     variant="secondary"
                     size="sm"
+                    loading={isSaving}
                     onClick={() => {
-                      if (generatedArticle && !currentArticle) {
-                        void handleSave()
-                      }
-                      router.push('/images')
+                      void (async () => {
+                        if (generatedArticle) {
+                          const ok = await handleSave()
+                          if (!ok) return
+                        }
+                        router.push('/images')
+                      })()
                     }}
                   >
                     <Image size={14} />

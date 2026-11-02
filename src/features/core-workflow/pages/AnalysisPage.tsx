@@ -11,6 +11,7 @@ import {
 import { useSearch, AnalysisData } from "@/features/core-workflow/context/SearchContext";
 import { clsx } from "clsx";
 import { GenerationProgress, GENERATION_RESULTS_ID } from "@/components/ui/generation-progress";
+import { ErrorBanner } from "@/components/ui/error-banner";
 
 function Tooltip({ text }: { text: string }) {
     return (
@@ -77,6 +78,7 @@ export default function AnalysisPage() {
         keyword
     } = useSearch();
     const [loadingChips, setLoadingChips] = useState<Set<string>>(new Set());
+    const [failedChips, setFailedChips] = useState<Set<string>>(new Set());
     const [sortKey, setSortKey] = useState<SortKey>("level");
     const [sortDir, setSortDir] = useState<SortDir>("desc");
     const [showGuide, setShowGuide] = useState(false);
@@ -87,9 +89,15 @@ export default function AnalysisPage() {
     useEffect(() => { analysisRef.current = analysisByVariation; }, [analysisByVariation]);
     useEffect(() => { activityRef.current = activityByVariation; }, [activityByVariation]);
 
-    const fetchAnalysis = useCallback(async (variation: string) => {
-        if (analysisRef.current[variation]) return;
+    const fetchAnalysis = useCallback(async (variation: string, force = false) => {
+        if (!force && analysisRef.current[variation]) return;
         setLoadingChips(prev => new Set(prev).add(variation));
+        setFailedChips(prev => {
+            if (!prev.has(variation)) return prev;
+            const next = new Set(prev);
+            next.delete(variation);
+            return next;
+        });
         try {
             const resp = await fetch("/api/analysis", {
                 method: "POST",
@@ -100,9 +108,12 @@ export default function AnalysisPage() {
                 const data: AnalysisData = await resp.json();
                 setAnalysisByVariation({ ...analysisRef.current, [variation]: data });
                 setActivityByVariation({ ...activityRef.current, [variation]: data.level });
+            } else {
+                setFailedChips(prev => new Set(prev).add(variation));
             }
         } catch (e) {
             console.error("Analysis fetch failed:", e);
+            setFailedChips(prev => new Set(prev).add(variation));
         } finally {
             setLoadingChips(prev => {
                 const next = new Set(prev);
@@ -111,6 +122,10 @@ export default function AnalysisPage() {
             });
         }
     }, [setAnalysisByVariation, setActivityByVariation]);
+
+    const retryFailed = () => {
+        failedChips.forEach((v) => void fetchAnalysis(v, true));
+    };
 
     useEffect(() => {
         if (variations.length > 0) {
@@ -232,6 +247,23 @@ export default function AnalysisPage() {
                 active={isAnalyzing}
                 label="Analyzing demand levels for each keyword..."
             />
+
+            {failedChips.size > 0 && !isAnalyzing ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <ErrorBanner
+                        className="flex-1"
+                        message={`Could not analyze ${failedChips.size} keyword${failedChips.size === 1 ? "" : "s"}. Try again.`}
+                    />
+                    <button
+                        type="button"
+                        onClick={retryFailed}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mcv-line-brass)] bg-brass-100 px-3 py-2 text-[13px] font-medium text-brass-700"
+                    >
+                        <RefreshCw size={13} />
+                        Retry
+                    </button>
+                </div>
+            ) : null}
 
             {/* Progress bar */}
             <div className="flex items-center gap-3">

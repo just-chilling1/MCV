@@ -38,6 +38,7 @@ import {
   ARTICLE_IMAGE_SLOTS,
   buildArticleImagePrompt,
 } from '@/features/article-images/lib/article-image-slots'
+import { enrichArticlesWithLocalImages } from '@/lib/article-images-enrich'
 
 const imageSections = ARTICLE_IMAGE_SLOTS
 
@@ -58,7 +59,6 @@ export default function ImagesPage() {
   const {
     currentArticle,
     articles,
-    setArticles,
     setCurrentArticle,
     updateArticle,
     saveArticleImages,
@@ -104,11 +104,8 @@ export default function ImagesPage() {
   }, [fullscreenImage, closeFullscreen])
 
   useEffect(() => {
-    if (articles.length > 0) {
-      setLoadingArticles(false)
-      return
-    }
     let cancelled = false
+    setLoadingArticles(true)
     void (async () => {
       const res = await fetchJson<{ articles?: Article[] }>('/api/articles')
       if (cancelled) return
@@ -117,20 +114,26 @@ export default function ImagesPage() {
         setLoadingArticles(false)
         return
       }
-      const fetched = res.data.articles ?? []
-      setArticles(
-        fetched.map((a) => {
-          if (a.images?.length) return a
-          const saved = useAppStore.getState().articleImages?.[a.id]
-          return saved?.length ? { ...a, images: saved } : a
-        })
+      const store = useAppStore.getState()
+      const { articles: enriched, imagePatches } = enrichArticlesWithLocalImages(
+        res.data.articles ?? [],
+        store.articleImages || {}
       )
+      for (const [id, imgs] of Object.entries(imagePatches)) {
+        store.saveArticleImages(id, imgs)
+      }
+      store.setArticles(enriched)
+      const cur = store.currentArticle
+      if (cur) {
+        const fresh = enriched.find((a) => a.id === cur.id)
+        if (fresh) store.setCurrentArticle(fresh)
+      }
       setLoadingArticles(false)
     })()
     return () => {
       cancelled = true
     }
-    // ponytail: hydrate articles once when store empty
+    // ponytail: hydrate articles once on mount; server images win
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -141,9 +144,9 @@ export default function ImagesPage() {
       return
     }
     const imageMap = useAppStore.getState().articleImages || {}
-    const saved = imageMap[currentArticle.id]?.length
-      ? imageMap[currentArticle.id]
-      : currentArticle.images || []
+    const saved = currentArticle.images?.length
+      ? currentArticle.images
+      : imageMap[currentArticle.id] || []
     const urls: Record<string, string> = {}
     const selected: Record<string, string> = {}
     for (const img of saved) {
@@ -300,8 +303,8 @@ export default function ImagesPage() {
     }
   }
 
-  const handleSaveArticle = async (navigateToPublish = false) => {
-    if (!currentArticle) return
+  const handleSaveArticle = async (next: 'publish' | 'vault' | null = null) => {
+    if (!currentArticle) return false
     setIsSaving(true)
     setSaveError('')
     setSaveUi('saving')
@@ -311,10 +314,8 @@ export default function ImagesPage() {
       const images = getSelectedImages() as ArticleImage[]
 
       saveArticleImages(currentArticle.id, images)
-
-      const updatedArticle = { ...currentArticle, images }
-      updateArticle(currentArticle.id, updatedArticle)
-      setCurrentArticle(updatedArticle)
+      updateArticle(currentArticle.id, { ...currentArticle, images })
+      setCurrentArticle({ ...currentArticle, images })
 
       const patch = await fetchJson<{ article: Article }>(`/api/articles?id=${currentArticle.id}`, {
         method: 'PATCH',
@@ -326,14 +327,20 @@ export default function ImagesPage() {
         throw new Error(patch.error || 'Could not sync images to the server')
       }
 
+      const saved = patch.data.article
+      if (saved) {
+        const serverImages = saved.images ?? images
+        saveArticleImages(saved.id, serverImages)
+        updateArticle(saved.id, saved)
+        setCurrentArticle(saved)
+      }
+
       setSaveUi('saved')
       setSaveUiAt(new Date())
 
-      if (navigateToPublish) {
-        router.push('/publish')
-      } else {
-        router.push('/dashboard')
-      }
+      if (next === 'publish') router.push('/publish')
+      else if (next === 'vault') router.push('/vault')
+      return true
     } catch (err: unknown) {
       saveArticleImages(currentArticle.id, previousImages)
       updateArticle(currentArticle.id, { ...currentArticle, images: previousImages })
@@ -343,6 +350,7 @@ export default function ImagesPage() {
       setSaveUi('error')
       toast(msg, { variant: 'error' })
       console.error(err)
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -458,7 +466,7 @@ export default function ImagesPage() {
               variant="secondary"
               size="sm"
               className="!h-9 md:!h-9 gap-1.5 px-3 text-sm"
-              onClick={() => void handleSaveArticle(false)}
+              onClick={() => void handleSaveArticle('vault')}
               loading={isSaving}
             >
               <Save size={16} />
@@ -467,7 +475,7 @@ export default function ImagesPage() {
             <Button
               size="sm"
               className="!h-9 md:!h-9 gap-1.5 px-3 text-sm"
-              onClick={() => void handleSaveArticle(true)}
+              onClick={() => void handleSaveArticle('publish')}
               loading={isSaving}
             >
               <Send size={16} />
@@ -504,7 +512,7 @@ export default function ImagesPage() {
           status={saveStatus}
           savedAt={saveUiAt}
           errorMessage={saveError || null}
-          onRetry={() => void handleSaveArticle(false)}
+          onRetry={() => void handleSaveArticle(null)}
           className="mb-6"
         />
       )}
@@ -589,11 +597,21 @@ export default function ImagesPage() {
               variant="secondary"
               size="sm"
               className="!h-9 md:!h-9 gap-1.5 px-3 text-sm"
-              onClick={() => router.push('/publish')}
+              loading={isSaving}
+              onClick={() => {
+                void (async () => {
+                  if (hasAnyImage) {
+                    await handleSaveArticle('publish')
+                    return
+                  }
+                  router.push('/publish')
+                })()
+              }}
             >
               Skip images
             </Button>
             <Button
+              variant="secondary"
               size="sm"
               className="!h-9 md:!h-9 gap-1.5 px-3 text-sm"
               onClick={() => setViewMode(true)}
@@ -601,6 +619,16 @@ export default function ImagesPage() {
             >
               <Eye size={16} />
               <span>View article</span>
+            </Button>
+            <Button
+              size="sm"
+              className="!h-9 md:!h-9 gap-1.5 px-3 text-sm"
+              loading={isSaving}
+              disabled={!hasAnyImage}
+              onClick={() => void handleSaveArticle('publish')}
+            >
+              <Send size={16} />
+              <span>Save & broadcast</span>
             </Button>
           </div>
 

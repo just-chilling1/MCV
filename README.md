@@ -18,6 +18,10 @@ npm run dev
 
 Point `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` at the existing Supabase project. New tables for premium modules are listed in [supabase/APPLY.md](supabase/APPLY.md). Do not re-run the article, snippet, or power-up migrations.
 
+Login, password reset, premium `/access` unlocks, and local auth bypass: [docs/LOGIN-ACCESS.md](docs/LOGIN-ACCESS.md).
+
+Production URL: [docs/PRODUCTION-URL.md](docs/PRODUCTION-URL.md). Known limitations: [docs/KNOWN-LIMITATIONS.md](docs/KNOWN-LIMITATIONS.md).
+
 ## Navigation
 
 | Label | Route |

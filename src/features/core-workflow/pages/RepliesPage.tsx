@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { SuccessCelebration } from "@/features/core-workflow/components/SuccessCelebration";
 import { GenerationProgress } from "@/components/ui/generation-progress";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { copyToClipboard } from "@/lib/clipboard";
 
 function PlatformBadge({ platform }: { platform: string }) {
@@ -37,6 +38,7 @@ export default function RepliesPage() {
     const router = useRouter();
     const currentAds = selectedAds || [];
     const [loadingReplyId, setLoadingReplyId] = useState<string | null>(null);
+    const [replyErrors, setReplyErrors] = useState<Record<string, string>>({});
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [showCelebration, setShowCelebration] = useState(false);
@@ -45,6 +47,12 @@ export default function RepliesPage() {
     const handleGenerate = async (post: Ad) => {
         setLoadingReplyId(post.id);
         setExpandedIds(prev => new Set(prev).add(post.id));
+        setReplyErrors((prev) => {
+            if (!prev[post.id]) return prev;
+            const next = { ...prev };
+            delete next[post.id];
+            return next;
+        });
 
         try {
             const resp = await fetch("/api/replies", {
@@ -52,16 +60,28 @@ export default function RepliesPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ads: [post], affiliateLink: affiliateLink || "" })
             });
-            const data = await resp.json();
+            const data = (await resp.json().catch(() => ({}))) as {
+                error?: string;
+                results?: Array<{ replies?: string[] }>;
+            };
             const result = data.results?.[0];
-            if (result?.replies) {
-                setRepliesByPostId({ ...repliesByPostId, [post.id]: result.replies });
-                const newTotal = totalGenerated + 1;
-                setTotalGenerated(newTotal);
-                if (newTotal === 1) setShowCelebration(true);
+            if (!resp.ok || !result?.replies?.length) {
+                setReplyErrors((prev) => ({
+                    ...prev,
+                    [post.id]: data.error || "Could not create replies. Try again.",
+                }));
+                return;
             }
+            setRepliesByPostId({ ...repliesByPostId, [post.id]: result.replies });
+            const newTotal = totalGenerated + 1;
+            setTotalGenerated(newTotal);
+            if (newTotal === 1) setShowCelebration(true);
         } catch (e) {
             console.error(e);
+            setReplyErrors((prev) => ({
+                ...prev,
+                [post.id]: "Could not create replies. Check your connection and try again.",
+            }));
         } finally {
             setLoadingReplyId(null);
         }
@@ -184,6 +204,7 @@ export default function RepliesPage() {
                     const replies = repliesByPostId[post.id] || [];
                     const isExpanded = expandedIds.has(post.id);
                     const isLoading = loadingReplyId === post.id;
+                    const replyError = replyErrors[post.id];
 
                     return (
                         <motion.div
@@ -225,11 +246,17 @@ export default function RepliesPage() {
                                 </div>
                             </div>
 
+                            {replyError ? (
+                                <div className="px-4 pb-3">
+                                    <ErrorBanner message={replyError} />
+                                </div>
+                            ) : null}
+
                             {/* Action bar */}
                             <div className="flex items-center justify-between px-4 py-2.5 border-t border-border-dim/15 bg-page">
                                 <button
                                     onClick={() => {
-                                        if (replies.length === 0) handleGenerate(post);
+                                        if (replies.length === 0 || replyError) handleGenerate(post);
                                         else toggleExpand(post.id);
                                     }}
                                     disabled={isLoading}
@@ -249,8 +276,14 @@ export default function RepliesPage() {
                                     ) : (
                                         <>
                                             <MessageSquare size={13} />
-                                            <span>{replies.length > 0 ? `${replies.length} Replies` : "Create Replies"}</span>
-                                            {replies.length > 0 && (isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                                            <span>
+                                                {replyError
+                                                    ? "Try again"
+                                                    : replies.length > 0
+                                                      ? `${replies.length} Replies`
+                                                      : "Create Replies"}
+                                            </span>
+                                            {replies.length > 0 && !replyError && (isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                                         </>
                                     )}
                                 </button>

@@ -10,6 +10,7 @@ import { useSearch, Ad } from "@/features/core-workflow/context/SearchContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { GenerationProgress, GENERATION_RESULTS_ID } from "@/components/ui/generation-progress";
+import { ErrorBanner } from "@/components/ui/error-banner";
 
 function PlatformBadge({ platform }: { platform: string }) {
     const isReddit = platform === "Reddit";
@@ -89,12 +90,20 @@ export default function RadarPage() {
     } = useSearch();
 
     const [loadingChip, setLoadingChip] = useState<string | null>(null);
+    const [failedChips, setFailedChips] = useState<Set<string>>(new Set());
     const router = useRouter();
 
     const currentPosts = postsByVariation[activeChip] || [];
+    const activeFailed = Boolean(activeChip && failedChips.has(activeChip));
 
     const fetchPostsForChip = async (chip: string) => {
         setLoadingChip(chip);
+        setFailedChips((prev) => {
+            if (!prev.has(chip)) return prev;
+            const next = new Set(prev);
+            next.delete(chip);
+            return next;
+        });
         try {
             const resp = await fetch("/api/jackpots", {
                 method: "POST",
@@ -104,17 +113,25 @@ export default function RadarPage() {
             if (resp.ok) {
                 const data = await resp.json();
                 setPostsByVariation({ ...postsByVariation, [chip]: data.results || [] });
+            } else {
+                setFailedChips((prev) => new Set(prev).add(chip));
             }
         } catch (e) {
             console.error("Fetch ads failed:", e);
+            setFailedChips((prev) => new Set(prev).add(chip));
         } finally {
             setLoadingChip(null);
         }
     };
 
     useEffect(() => {
-        if (activeChip && (!postsByVariation[activeChip] || postsByVariation[activeChip].length === 0) && !loadingChip) {
-            fetchPostsForChip(activeChip);
+        if (
+            activeChip &&
+            (!postsByVariation[activeChip] || postsByVariation[activeChip].length === 0) &&
+            !loadingChip &&
+            !failedChips.has(activeChip)
+        ) {
+            void fetchPostsForChip(activeChip);
         }
     }, [activeChip]);
 
@@ -202,6 +219,23 @@ export default function RadarPage() {
                 label={loadingChip ? `Finding ads for "${loadingChip}"...` : "Finding ads..."}
             />
 
+            {activeFailed && loadingChip !== activeChip ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <ErrorBanner
+                        className="flex-1"
+                        message={`Could not load ads for "${activeChip}". Try again.`}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => void fetchPostsForChip(activeChip)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mcv-line-brass)] bg-brass-100 px-3 py-2 text-[13px] font-medium text-brass-700"
+                    >
+                        <Sparkles size={13} />
+                        Retry
+                    </button>
+                </div>
+            ) : null}
+
             {/* Ads grid */}
             <div id={GENERATION_RESULTS_ID} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 scroll-mt-24">
                 <AnimatePresence mode="popLayout">
@@ -218,7 +252,7 @@ export default function RadarPage() {
                                 onToggle={() => togglePostSelection(post)}
                             />
                         ))
-                    ) : (
+                    ) : activeFailed ? null : (
                         <div className="col-span-full py-16 flex flex-col items-center justify-center gap-3 border border-dashed border-border-dim/30 rounded-xl">
                             <Search size={32} className="text-text-muted/20" />
                             <p className="text-sm text-text-muted font-medium">No ads found for &ldquo;{activeChip}&rdquo;</p>

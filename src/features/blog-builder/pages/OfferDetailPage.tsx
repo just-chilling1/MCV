@@ -245,6 +245,7 @@ export default function OfferDetailPage({ siteId }: { siteId: string }) {
   const [clicks, setClicks] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const [viewerVersion, setViewerVersion] = useState<ThreadVersion | null>(null);
   const [deletingVersion, setDeletingVersion] = useState<ThreadVersion | null>(null);
@@ -257,11 +258,27 @@ export default function OfferDetailPage({ siteId }: { siteId: string }) {
 
   const loadOffer = useCallback(
     (options?: { silent?: boolean }) => {
-      if (!options?.silent) setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+        setNotFound(false);
+        setLoadFailed(false);
+      }
       return fetch(`/api/blog/site?siteId=${encodeURIComponent(siteId)}`, { cache: "no-store" })
         .then(async (res) => {
           const data = await res.json().catch(() => ({}));
-          if (!res.ok || !data.site) {
+          if (res.status === 404) {
+            setNotFound(true);
+            return;
+          }
+          if (!res.ok) {
+            if (options?.silent) {
+              setError("Could not refresh this offer. Try again.");
+            } else {
+              setLoadFailed(true);
+            }
+            return;
+          }
+          if (!data.site) {
             setNotFound(true);
             return;
           }
@@ -272,7 +289,11 @@ export default function OfferDetailPage({ siteId }: { siteId: string }) {
           setClicks(typeof data.clicks === "number" ? data.clicks : 0);
         })
         .catch(() => {
-          setNotFound(true);
+          if (options?.silent) {
+            setError("Could not refresh this offer. Try again.");
+          } else {
+            setLoadFailed(true);
+          }
         })
         .finally(() => {
           if (!options?.silent) setLoading(false);
@@ -443,6 +464,24 @@ export default function OfferDetailPage({ siteId }: { siteId: string }) {
       <div className="page-container">
         <PageHeader eyebrow="Offers library" title="Loading offer..." subtitle="" />
         <PageSkeleton cards={2} />
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="page-container">
+        <PageHeader
+          eyebrow="Offers library"
+          title="Could not load offer"
+          subtitle="Something went wrong while loading this offer."
+        />
+        <EmptyState
+          icon={Globe}
+          title="Could not load this offer"
+          description="Check your connection and try again."
+          action={{ label: "Try again", onClick: () => void loadOffer() }}
+        />
       </div>
     );
   }

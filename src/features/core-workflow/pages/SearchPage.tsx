@@ -7,6 +7,7 @@ import { useSearch } from "@/features/core-workflow/context/SearchContext";
 import { motion } from "framer-motion";
 import { SuccessCelebration } from "@/features/core-workflow/components/SuccessCelebration";
 import { GenerationProgress } from "@/components/ui/generation-progress";
+import { ErrorBanner } from "@/components/ui/error-banner";
 
 export default function SearchPage() {
     const {
@@ -17,6 +18,7 @@ export default function SearchPage() {
     const [loading, setLoading] = useState(false);
     const [showCelebration, setShowCelebration] = useState(false);
     const [foundCount, setFoundCount] = useState(0);
+    const [error, setError] = useState("");
     const router = useRouter();
 
     const handleSearch = async (val?: string) => {
@@ -24,6 +26,7 @@ export default function SearchPage() {
         if (!searchVal) return;
 
         setLoading(true);
+        setError("");
         addToHistory(searchVal);
 
         try {
@@ -32,10 +35,13 @@ export default function SearchPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ keyword: searchVal })
             });
-            const data = await resp.json();
+            const data = (await resp.json().catch(() => ({}))) as {
+                error?: string;
+                variations?: string[];
+            };
 
             if (!resp.ok) {
-                alert(data.error || "Search failed. Please try again.");
+                setError(data.error || "Search failed. Please try again.");
                 return;
             }
 
@@ -45,7 +51,7 @@ export default function SearchPage() {
             setShowCelebration(true);
         } catch (e) {
             console.error(e);
-            alert("A network error occurred. Please check your connection.");
+            setError("A network error occurred. Please check your connection.");
         } finally {
             setLoading(false);
         }
@@ -112,6 +118,8 @@ export default function SearchPage() {
                         </div>
                     )}
                 </button>
+
+                {error ? <ErrorBanner message={error} /> : null}
             </div>
 
             <GenerationProgress

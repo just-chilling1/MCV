@@ -32,6 +32,6 @@ describe("brand compliance", () => {
 
   it("defines the Mobile Cash Vault support email", () => {
     expect(CANONICAL_SUPPORT_EMAIL).toBe(SUPPORT_EMAIL);
-    expect(SUPPORT_EMAIL).toBe("MobileCashVault@neoai.freshdesk.com");
+    expect(SUPPORT_EMAIL).toBe("mobilecashvault@neoai.freshdesk.com");
   });
 });

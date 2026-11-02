@@ -922,11 +922,11 @@ export default function InfinitePage() {
                   <h3 className="font-semibold text-ink text-sm mb-2 line-clamp-2 group-hover:text-accent-blue transition-colors">
                     {article.title}
                   </h3>
-                  <div className="flex items-center gap-3 text-xs text-bp-muted">
-                    <span className="flex items-center gap-1"><FileText size={11} /> ~1,500 words</span>
-                    <span className="flex items-center gap-1"><ImageIcon size={11} /> 3 images</span>
-                    <span className="flex items-center gap-1"><TrendingUp size={11} /> SEO</span>
-                    <span className="flex items-center gap-1 text-success"><Check size={11} /> Ready</span>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-bp-muted">
+                    <span className="inline-flex items-center gap-1"><FileText size={11} /> ~1,500 words</span>
+                    <span className="inline-flex items-center gap-1"><ImageIcon size={11} /> 3 images</span>
+                    <span className="inline-flex items-center gap-1"><TrendingUp size={11} /> SEO</span>
+                    <span className="inline-flex items-center gap-1 text-success"><Check size={11} /> Ready</span>
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-bp-muted group-hover:text-accent-blue transition-colors shrink-0 mt-1" />

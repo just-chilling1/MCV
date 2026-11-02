@@ -24,4 +24,4 @@ This app reuses the existing project. The project ref and `*.supabase.co` URL do
 
 ## Support
 
-The in-app address is `MobileCashVault@neoai.freshdesk.com` in `src/config/support.config.ts`. Create that mailbox, or change the constant to the address the manager confirms. Outbound mail still uses `support@reliteagency.com` on Resend.
+The in-app address is `mobilecashvault@neoai.freshdesk.com` in `src/config/support.config.ts`. Create that mailbox, or change the constant to the address the manager confirms. Outbound mail still uses `support@reliteagency.com` on Resend.

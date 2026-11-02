@@ -2,10 +2,9 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 
-interface EmptyStateAction {
-  label: string;
-  href: string;
-}
+type EmptyStateAction =
+  | { label: string; href: string; onClick?: never }
+  | { label: string; onClick: () => void; href?: never };
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -24,9 +23,15 @@ export function EmptyState({ icon: Icon, title, description, action, className }
       <h2 className="ds-h4 text-text-heading">{title}</h2>
       <p className="empty-state-copy">{description}</p>
       {action ? (
-        <Link href={action.href} className="btn-primary mt-2">
-          {action.label}
-        </Link>
+        action.href ? (
+          <Link href={action.href} className="btn-primary mt-2">
+            {action.label}
+          </Link>
+        ) : (
+          <button type="button" onClick={action.onClick} className="btn-primary mt-2">
+            {action.label}
+          </button>
+        )
       ) : null}
     </div>
   );

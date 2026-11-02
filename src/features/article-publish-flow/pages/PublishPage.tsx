@@ -40,6 +40,10 @@ import EarningsBanner from '@/components/ui/earnings-banner'
 import { useScrollOnGenerationComplete } from '@/hooks/use-scroll-on-generation-complete'
 import { markPublishCopyDone } from '@/lib/onboarding'
 import PageHeader from '@/components/ui/page-header'
+import {
+  enrichArticlesWithLocalImages,
+  SNIPPET_LIBRARY_PATH,
+} from '@/lib/article-images-enrich'
 
 const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   Linkedin,
@@ -74,11 +78,11 @@ interface SuggestedTag {
 }
 
 function withSavedImages(article: Article): Article {
-  const saved = useAppStore.getState().articleImages?.[article.id]
-  if (saved && saved.length > 0 && (!article.images || article.images.length === 0)) {
-    return { ...article, images: saved }
-  }
-  return article
+  const { articles } = enrichArticlesWithLocalImages(
+    [article],
+    useAppStore.getState().articleImages || {}
+  )
+  return articles[0] ?? article
 }
 
 function formatDate(dateString: string) {
@@ -131,10 +135,6 @@ function PublishPageContent() {
   }, [currentArticle?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (articles.length > 0) {
-      setIsLoadingArticles(false)
-      return
-    }
     let cancelled = false
     setIsLoadingArticles(true)
     void fetchJson<{ articles?: Article[] }>('/api/articles').then((res) => {
@@ -143,20 +143,34 @@ function PublishPageContent() {
         setIsLoadingArticles(false)
         return
       }
+      const store = useAppStore.getState()
       const fetched = res.data.articles ?? []
-      const local = useAppStore.getState().articles
-      const fetchedIds = new Set(fetched.map((a) => a.id))
+      const { articles: enriched, imagePatches } = enrichArticlesWithLocalImages(
+        fetched,
+        store.articleImages || {}
+      )
+      for (const [id, imgs] of Object.entries(imagePatches)) {
+        store.saveArticleImages(id, imgs)
+      }
+      const fetchedIds = new Set(enriched.map((a) => a.id))
       const combined = [
-        ...fetched,
-        ...local.filter((a) => !fetchedIds.has(a.id)),
-      ].map(withSavedImages)
-      useAppStore.getState().setArticles(combined)
+        ...enriched,
+        ...store.articles.filter((a) => !fetchedIds.has(a.id)).map(withSavedImages),
+      ]
+      store.setArticles(combined)
+      const cur = store.currentArticle
+      if (cur) {
+        const fresh = combined.find((a) => a.id === cur.id)
+        if (fresh) store.setCurrentArticle(fresh)
+      }
       setIsLoadingArticles(false)
     })
     return () => {
       cancelled = true
     }
-  }, [articles.length])
+    // ponytail: hydrate once on mount; server images win
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const id = searchParams.get('articleId')
@@ -712,7 +726,7 @@ function PublishPageContent() {
                     <h3 className="truncate text-sm font-semibold text-ink">Snippet library</h3>
                   </div>
                   <Link
-                    href="/links"
+                    href={SNIPPET_LIBRARY_PATH}
                     className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-brass-700 hover:underline"
                   >
                     Manage
@@ -728,7 +742,7 @@ function PublishPageContent() {
                 ) : snippets.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-border-dim bg-field px-3 py-4 text-center text-xs text-text-muted">
                     No snippets yet.{' '}
-                    <Link href="/links" className="text-brass-700 underline-offset-2 hover:underline">
+                    <Link href={SNIPPET_LIBRARY_PATH} className="text-brass-700 underline-offset-2 hover:underline">
                       Add some in the library
                     </Link>
                     .

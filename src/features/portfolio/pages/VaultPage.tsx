@@ -33,6 +33,7 @@ import { copyToClipboard } from '@/lib/clipboard'
 import { useToast } from '@/contexts/ToastContext'
 import PublishKitDrawer from '@/components/publish/PublishKitDrawer'
 import { markPublishCopyDone } from '@/lib/onboarding'
+import { enrichArticlesWithLocalImages } from '@/lib/article-images-enrich'
 
 const platformIcons: Record<string, typeof Linkedin> = {
   linkedin: Linkedin,
@@ -86,26 +87,23 @@ export default function MyPortfolioPage() {
   const [publishKitArticle, setPublishKitArticle] = useState<Article | null>(null)
   const [publishKitOpen, setPublishKitOpen] = useState(false)
 
-  const enrichWithImages = (list: Article[]): Article[] => {
-    const imageMap = useAppStore.getState().articleImages || {}
-    return list.map((a) => {
-      if (a.images?.length) return a
-      const saved = imageMap[a.id]
-      return saved?.length ? { ...a, images: saved } : a
-    })
-  }
-
   useEffect(() => {
     let cancelled = false
     const load = async () => {
       setIsLoading(true)
       const res = await fetchJson<{ articles?: Article[] }>('/api/articles')
       if (cancelled) return
+      const store = useAppStore.getState()
       if (res.ok) {
-        const fetchedArticles: Article[] = res.data.articles || []
-        const final = enrichWithImages(fetchedArticles)
+        const { articles: final, imagePatches } = enrichArticlesWithLocalImages(
+          res.data.articles || [],
+          store.articleImages || {}
+        )
+        for (const [id, imgs] of Object.entries(imagePatches)) {
+          store.saveArticleImages(id, imgs)
+        }
         setArticles(final)
-        useAppStore.getState().setArticles(final)
+        store.setArticles(final)
       } else {
         if (res.status !== 401) {
           toast(
@@ -113,7 +111,11 @@ export default function MyPortfolioPage() {
             { variant: 'error' }
           )
         }
-        setArticles(enrichWithImages(useAppStore.getState().articles))
+        const { articles: local } = enrichArticlesWithLocalImages(
+          store.articles,
+          store.articleImages || {}
+        )
+        setArticles(local)
       }
       setIsLoading(false)
     }

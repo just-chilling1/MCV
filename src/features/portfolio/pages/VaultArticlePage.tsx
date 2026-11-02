@@ -29,6 +29,7 @@ import { useToast } from '@/contexts/ToastContext'
 import PublishKitDrawer from '@/components/publish/PublishKitDrawer'
 import { sanitizeArticleContent } from '@/lib/rapidapi-chat'
 import { sanitizePostHtml } from '@/features/blog-builder/lib/sanitize-html'
+import { SNIPPET_LIBRARY_PATH } from '@/lib/article-images-enrich'
 
 const PLATFORMS: Platform[] = ['linkedin', 'medium', 'quora', 'reddit', 'twitter', 'facebook']
 
@@ -82,6 +83,8 @@ export default function ArticleViewPage() {
   const { toast } = useToast()
   const [article, setArticle] = useState<Article | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [publishKitOpen, setPublishKitOpen] = useState(false)
 
   const [seo, setSeo] = useState<SeoPayload | null>(null)
@@ -113,6 +116,7 @@ export default function ArticleViewPage() {
     if (!articleId) return
     let cancelled = false
     setLoadError(false)
+    setLoadFailed(false)
     setArticle(null)
 
     const resolve = async () => {
@@ -121,7 +125,7 @@ export default function ArticleViewPage() {
         const res = await fetchJson<{ articles?: Article[] }>('/api/articles')
         if (cancelled) return
         if (!res.ok) {
-          setLoadError(true)
+          setLoadFailed(true)
           return
         }
         const list = res.data.articles || []
@@ -134,6 +138,7 @@ export default function ArticleViewPage() {
         return
       }
       setLoadError(false)
+      setLoadFailed(false)
       setArticle(enrichArticle(found))
       setTagPlatform(primaryPlatform(found.platform))
     }
@@ -142,7 +147,7 @@ export default function ArticleViewPage() {
     return () => {
       cancelled = true
     }
-  }, [articleId])
+  }, [articleId, reloadKey])
 
   const runSeo = useCallback(async (a: Article) => {
     setSeoLoading(true)
@@ -300,11 +305,32 @@ export default function ArticleViewPage() {
     return null
   }
 
-  if (!article && !loadError) {
+  if (!article && !loadError && !loadFailed) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col items-center justify-center py-24 text-bp-muted">
         <Loader2 className="mb-3 h-10 w-10 animate-spin text-bp-blue" />
         Loading article…
+      </div>
+    )
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <p className="mb-2 text-ink">Could not load this article.</p>
+        <p className="mb-4 text-sm text-bp-muted">Check your connection and try again.</p>
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="btn-primary"
+          >
+            Try again
+          </button>
+          <Link href="/vault" className="text-brass-700 hover:underline">
+            Back to Content Reserve
+          </Link>
+        </div>
       </div>
     )
   }
@@ -554,7 +580,7 @@ export default function ArticleViewPage() {
         ) : snippets.length === 0 ? (
           <p className="text-sm text-bp-muted">
             No snippets yet.{' '}
-            <Link href="/links" className="text-brass-700 hover:underline">
+            <Link href={SNIPPET_LIBRARY_PATH} className="text-brass-700 hover:underline">
               Add some in the library
             </Link>
           </p>

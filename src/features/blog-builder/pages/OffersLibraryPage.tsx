@@ -158,6 +158,7 @@ function OfferCard({
 export default function OffersLibraryPage() {
   const [summaries, setSummaries] = useState<SiteVaultSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "live" | "draft">("all");
   const [threadsBySite, setThreadsBySite] = useState<Record<string, SavedXThread[]>>({});
@@ -167,13 +168,22 @@ export default function OffersLibraryPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadSummaries = () => {
+    setLoading(true);
+    setLoadError(false);
     void cachedClientFetch<{ summaries?: SiteVaultSummary[] }>("/api/blog/site?lite=1")
       .then((data) => {
         setSummaries(Array.isArray(data.summaries) ? data.summaries : []);
       })
-      .catch(() => setSummaries([]))
+      .catch(() => {
+        setSummaries([]);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadSummaries();
   }, []);
 
   const origin = typeof window !== "undefined" ? window.location.origin : getAppUrl();
@@ -271,6 +281,24 @@ export default function OffersLibraryPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="page-container">
+        <PageHeader
+          eyebrow="Offers library"
+          title="Your generated sales offers"
+          subtitle="Every launched sales page lives here with its saved threads, Facebook posts, and authority articles."
+        />
+        <EmptyState
+          icon={Globe}
+          title="Could not load offers"
+          description="Check your connection and try again."
+          action={{ label: "Try again", onClick: loadSummaries }}
+        />
+      </div>
+    );
+  }
+
   if (summaries.length === 0) {
     return (
       <div className="page-container">
@@ -305,7 +333,7 @@ export default function OffersLibraryPage() {
 
       {summaries.length >= 2 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
+          <div className="relative min-w-0 w-full flex-1 sm:min-w-[220px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
             <input
               type="search"
